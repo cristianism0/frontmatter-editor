@@ -15,7 +15,7 @@ BACKUP_PATH = Path('.') / 'BACKUP'
 # If you want to exclude a directory from being touched, move it to backup:
 # Secret directories (starts with a .) will be ignored by default.
 # Backup is EXCLUDED by default.
-EXCLUDE_DIRS = ['BACKUP', 'BACKUP copy/test']
+EXCLUDE_DIRS = []
 
 def proceed(line: str) -> bool:
     """Ask for proceed a task"""
@@ -54,21 +54,24 @@ def backup_dir(MD_files: list, BACKUP_PATH: Path = BACKUP_PATH, choice: bool = B
     else:
         print("Backup directory was not created.")
 
-def filter_dirs(EXCLUDE_DIRS: list = EXCLUDE_DIRS):
+def filter_dirs(PATH: Path = PATH, BACKUP_PATH: Path = BACKUP_PATH, EXCLUDE_DIRS: list = EXCLUDE_DIRS):
     """Filter the directories: Taking out hidden and EXCLUDED"""
-    EXCLUDED = []
-    for item in EXCLUDE_DIRS:
-        EXCLUDED.extend([Path(item)])
+
+    # Create PATH for each item on EXCLUDE_DIRS
+    EXCLUDED_PATHS = [Path(dirs) for dirs in EXCLUDE_DIRS]
+
+    # Lambda function for iterate (is_relative_to)
+    relative_exclude = lambda d: any(d.is_relative_to(expath) for expath in EXCLUDED_PATHS)
 
     filtered_dirs = [
         f for f in PATH.glob('**/*')
         if f.is_dir()
-        and not f        in EXCLUDED
-        and not f.parent in EXCLUDED
+        and not f.is_relative_to(BACKUP_PATH)
         and not f.full_match('.*')
         and not f.full_match('.*/**')
+        and not relative_exclude(f)
     ]
-    
+
     return filtered_dirs
 
 def collect_dirs_and_files(PATH: object = PATH, EXCLUDE_DIRS: list = EXCLUDE_DIRS):
@@ -108,20 +111,21 @@ def reconstruct(file, header, body):
 
 def metadata_remover(files: list):
     """Read all meta data from the folders."""
-    conteudo = 'teste'
-    for file in files:
+    names = map(str(), files)
+    print(names)
+    for file in names:
         header_lines = []
         body_lines = []
         with file.open() as f:
             for line in f:
                 if line.startswith('---'):
-                    header_lines.append('---' + '\n')
+                    header_lines.append(('---' + '\n'))
                     # Collect the header
                     while line.startswith('---') == False:
                         header_lines.append(line + '\n')
 
                     # Close frontmatter
-                    header_lines.append('---' + '\n')
+                    header_lines.append(('---' + '\n'))
 
                 else:
                     # If there is no front matter, or if already collected, get the content
@@ -146,10 +150,8 @@ def metadata_changer(files: list):
 
     return 0
 
-
-
-
 ######################### DEBUG #################################
 
-child, files = collect_dirs_and_files()
-#metadata_remover(files)
+filter_dirs()
+#dirs, files = collect_dirs_and_files()
+#metadata_remover(dirs)

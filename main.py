@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from pathlib import PurePath
 
@@ -8,12 +7,15 @@ PATH = Path('.')
 # Do you want to backup all your files on a BACKUP directory?
 # YES -> True (default)
 # NO -> False
-BACKUP = True
+BACKUP = False
+
+# If you want to change backup directory path, change the path inside Path('new/path').
+BACKUP_PATH = Path('.') / 'BACKUP'
 
 # If you want to exclude a directory from being touched, move it to backup:
 # Secret directories (starts with a .) will be ignored by default.
 # Backup is EXCLUDED by default.
-EXCLUDE_DIRS = ["BACKUP"]
+EXCLUDE_DIRS = ['BACKUP', 'BACKUP copy/test']
 
 def proceed(line: str) -> bool:
     """Ask for proceed a task"""
@@ -23,66 +25,131 @@ def proceed(line: str) -> bool:
     else:
         return False
 
-
-def backup_dir(MD_files: list, choice: bool = BACKUP):
+def backup_dir(MD_files: list, BACKUP_PATH: Path = BACKUP_PATH, choice: bool = BACKUP):
     """Create a BACKUP directory on the PATH."""
+    if choice:
+        # Create the BACKUP directory
+        if Path(BACKUP_PATH).exists():
+            print("BACKUP directory already exists!")
+            print("All the .md files collect will be saved there!")
+            print("WARNING: if there's files with the same name, they will be overwritten.")
 
-    if Path('BACKUP').exists():
-        print('BACKUP directory already exists!')
-        print("You can remove or create a new BACKUP inside BACKUP directory.")
+        else:    
+            BACKUP_PATH.mkdir()
 
-        output = proceed("Do you want to proceed? [Y/n]:  ")
-        if output == False: print("Backup folder was not created.")
+        # It will create a parent directory for each file for better organization.
+        for files in MD_files:
+            path = PurePath(files)
+            parent_path = BACKUP_PATH / path.parent 
+            parent_path.mkdir(exist_ok= True)
 
-        if choice:
-            backup_path = Path('BACKUP')
-            backup_path.mkdir(exist_ok = True)
+            # It will copy a file in its respective parent name.
+            # If the MD is on the root, it will move to backup.
+            if path.parent == PurePath():
+                files.copy_into(BACKUP_PATH, preserve_metadata = True)
 
-            # It will creater a parent folder for each file for better organization.
-            for files in MD_files:
-                path = PurePath(files)
-                parent_path = backup_path / path.parent 
-                parent_path.mkdir(exist_ok= True)
-
-                # It will copy a file in its respective parent name.
-                # If the MD is on the root, it will move to backup.
-                if path.parent == PurePath():
-                    files.copy_into('BACKUP', preserve_metadata = True)
-
-                else:
-                    files.copy_into(parent_path, preserve_metadata = True)
+            else:
+                files.copy_into(parent_path, preserve_metadata = True)
                     
     else:
-        print("Backup folder was not created.")
+        print("Backup directory was not created.")
 
+def filter_dirs(EXCLUDE_DIRS: list = EXCLUDE_DIRS):
+    """Filter the directories: Taking out hidden and EXCLUDED"""
+    EXCLUDED = []
+    for item in EXCLUDE_DIRS:
+        EXCLUDED.extend([Path(item)])
 
+    filtered_dirs = [
+        f for f in PATH.glob('**/*')
+        if f.is_dir()
+        and not f        in EXCLUDED
+        and not f.parent in EXCLUDED
+        and not f.full_match('.*')
+        and not f.full_match('.*/**')
+    ]
+    
+    return filtered_dirs
 
-def collect_dirs_md(PATH: object = PATH, EXCLUDE_DIRS: list = EXCLUDE_DIRS):
+def collect_dirs_and_files(PATH: object = PATH, EXCLUDE_DIRS: list = EXCLUDE_DIRS):
     """Collect all subdirectories from PATH and all md files on each of it."""
+    
+    filtered_dirs = filter_dirs(EXCLUDE_DIRS)
 
-    # Filter hidden directories and from EXCLUDE DIRS.
-    CHILD_NAMES = [child.name for child in PATH.iterdir()
-                   if not child.name.startswith('.') 
-                   and child.name not in EXCLUDE_DIRS
-                   and child.is_dir()]
-
-
-    #This log is for another function
-    print("WARNING: SubDirectories accessed: %s", CHILD_NAMES)
+    print("\nWARNING: Directories accessed: ", filtered_dirs)
     print("If you want to remove any of it, put on EXCLUDE_DIR.\n")
 
+    root_files = list(PATH.glob("**.md"))
+    md_files = []
+
+    # Collect files on the root path
+    md_files.extend(root_files)
+
     # Iterate over all directories and find .md files:
-    md_files = list(PATH.rglob('**.md'))
+    for dirs in filtered_dirs:
+        # Collect files on selected subdirectories
+        files = list(Path(PATH / dirs).rglob("**.md"))
 
-    return md_files
+        # Put all files collected here
+        md_files.extend(files)
 
-def meta_data_reader():
+    return filtered_dirs, md_files
+
+def reconstruct(file, header, body):
+    """Reconstruct the file: New header + Content"""
+    with file.open(mode = 'w') as f:
+        for header_lines in header:
+            f.write(header_lines)
+
+        for body_lines in body:
+            f.write(body_lines)
+
+    return file
+
+def metadata_remover(files: list):
     """Read all meta data from the folders."""
+    conteudo = 'teste'
+    for file in files:
+        header_lines = []
+        body_lines = []
+        with file.open() as f:
+            for line in f:
+                if line.startswith('---'):
+                    header_lines.append('---' + '\n')
+                    # Collect the header
+                    while line.startswith('---') == False:
+                        header_lines.append(line + '\n')
+
+                    # Close frontmatter
+                    header_lines.append('---' + '\n')
+
+                else:
+                    # If there is no front matter, or if already collected, get the content
+                    body_lines.append(line + '\n')
+
+        print(reconstruct(file, header_lines, body_lines))
+        print("=================")
+        file.read_text()
+        print("=================")
+
+    return 0
+
+def metadata_changer(files: list):
+    """Read all meta data from the folders."""
+    # Iterate over FILES, so we will need md files because has full path
+    for file in files:
+        with file.open() as f:
+            for line in f:
+                if line.startswith('---'):
+                    print()
+
+
     return 0
 
 
 
-### DEBUG
 
-md = collect_dirs_md()
-backup_dir(md)
+######################### DEBUG #################################
+
+child, files = collect_dirs_and_files()
+#metadata_remover(files)

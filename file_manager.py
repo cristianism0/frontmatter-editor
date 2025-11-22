@@ -32,7 +32,7 @@ def backup_dir(MD_files: list, backup_path: Path) -> None:
     
     return None
 
-def sub_filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_PATH) -> List[Path]:
+def filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_PATH) -> List[Path]:
     """Filter the directories: Taking out hidden and EXCLUDED"""
 
     # Create path for each item on exclude_dirs
@@ -54,7 +54,7 @@ def sub_filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_P
 def collect_dirs_and_files(path: Path, exclude_dirs: list ) -> Tuple[List[Path], list]:
     """Collect all subdirectories from path and all md files on each of it."""
     
-    filtered_dirs = sub_filter_dirs(path, exclude_dirs)
+    filtered_dirs = filter_dirs(path, exclude_dirs)
 
     md_files = []
     # Iterate over all directories and find .md files:
@@ -67,7 +67,7 @@ def collect_dirs_and_files(path: Path, exclude_dirs: list ) -> Tuple[List[Path],
 
     return filtered_dirs, md_files
 
-def sub_reconstruct(file, header, body, frontmatter: bool) -> None:
+def file_reconstruct(file, header, body, frontmatter: bool) -> None:
     """Reconstruct the file: New header + Content"""
 
     with file.open(mode = 'w') as f:
@@ -82,7 +82,7 @@ def sub_reconstruct(file, header, body, frontmatter: bool) -> None:
 
         f.writelines(body)
 
-def sub_frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
+def frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
     """Collect frontmatter from a .md file"""
 
     header_lines = {}
@@ -124,7 +124,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     after_delete_content = {}
 
     for file in files:
-        file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
+        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
         # Save content for log:
         file_key = file.as_posix()
@@ -153,7 +153,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     if dry_run:
         return previous_delete_content, after_delete_content
     else:
-        sub_reconstruct(file, new_header, body_lines, has_frontmatter)
+        file_reconstruct(file, new_header, body_lines, has_frontmatter)
         return previous_delete_content
     
 def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
@@ -165,7 +165,7 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
     after_change_content = {}
 
     for file in files:
-        file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
+        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
         # Save content for log:
         file_key = file.as_posix()
@@ -191,10 +191,10 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
     if dry_run:
         return previous_change_content, after_change_content
     else:
-        sub_reconstruct(file, new_header, body_lines, has_frontmatter)
+        file_reconstruct(file, new_header, body_lines, has_frontmatter)
         return previous_change_content, after_change_content  
 
-def sub_json_templater(files: list) -> list:
+def json_templater(files: list) -> list:
     """Aplly template for files in json output"""
     json_complete = []
 
@@ -211,7 +211,7 @@ def sub_json_templater(files: list) -> list:
 def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
     """Create a JSON file with all alterations"""
 
-    json_list = sub_json_templater(files)
+    json_list = json_templater(files)
 
     print("==========DEBUB SECTION==========")
     print(previous)

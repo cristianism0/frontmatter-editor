@@ -1,6 +1,11 @@
 from pathlib import Path, PurePath
 import json
 from config import BACKUP_PATH
+from typing import List, Tuple
+from datetime import datetime
+
+from config import PATH, EXCLUDE_DIRS
+
 
 def sub_proceed(line: str) -> bool:
     """Ask for proceed a task"""
@@ -10,130 +15,202 @@ def sub_proceed(line: str) -> bool:
     else:
         return False
 
-def backup_dir(MD_files: list, backup_path: Path, create_backup: bool):
+def backup_dir(MD_files: list, backup_path: Path) -> None:
     """Create a BACKUP directory on the path."""
-    if create_backup:
-        # Create the BACKUP directory
-        if Path(backup_path).exists():
-            print("BACKUP directory already exists!")
-            print("All the .md files collected will be saved there!")
-            print("WARNING: if there's files with the same name, they will be overwritten.")
+    # It will create a parent directory for each file for better organization.
+    for files in MD_files:
+        path = PurePath(files)
+        parent_path = backup_path / path.parent 
+        parent_path.mkdir(exist_ok= True, parents = True)
+        # It will copy a file in its respective parent name.
+        # If the MD is on the root, it will move to backup.
+        if path.parent == PurePath():
+            files.copy_into(backup_path, preserve_metadata = True)
+        else:
+            files.copy_into(parent_path, preserve_metadata = True)
+    
+    
+    return None
 
-        else:    
-            backup_path.mkdir()
-            print(f"A BACKUP directory was created at: {str(backup_dir)}")
-
-        # It will create a parent directory for each file for better organization.
-        for files in MD_files:
-            path = PurePath(files)
-            parent_path = backup_path / path.parent 
-            parent_path.mkdir(exist_ok= True)
-
-            # It will copy a file in its respective parent name.
-            # If the MD is on the root, it will move to backup.
-            if path.parent == PurePath():
-                files.copy_into(backup_path, preserve_metadata = True)
-
-            else:
-                files.copy_into(parent_path, preserve_metadata = True)
-                    
-    else:
-        print("Backup directory was not created.")
-
-def sub_filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_PATH):
+def sub_filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_PATH) -> List[Path]:
     """Filter the directories: Taking out hidden and EXCLUDED"""
 
     # Create path for each item on exclude_dirs
-    excluded_paths = [path(dirs) for dirs in exclude_dirs]
+    excluded_paths = [Path(dirs) for dirs in exclude_dirs]
 
-    # Lambda function for iterate (is_relative_to)
-    relative_exclude = lambda d: any(d.is_relative_to(expath) for expath in excluded_paths)
+    fun_match = lambda d: any(d.is_relative_to(expath) for expath in excluded_paths)
+
     filtered_dirs = [
-        f for f in path.glob('**/*')
+        f for f in path.glob('**/*')          # Recursive search for dirs
         if f.is_dir()
         and not f.is_relative_to(backup_path)
         and not f.full_match('.*')
-        and not f.full_match('.*/**')
-        and not relative_exclude(f)
+        and not f.full_match('.*/**')         # Recursive search for files inside hidden dirs
+        and not fun_match(f)
     ]
 
     return filtered_dirs
 
-def collect_dirs_and_files(path: Path, exclude_dirs: list ):
+def collect_dirs_and_files(path: Path, exclude_dirs: list ) -> Tuple[List[Path], list]:
     """Collect all subdirectories from path and all md files on each of it."""
     
     filtered_dirs = sub_filter_dirs(path, exclude_dirs)
 
-    print("\nWARNING: Directories accessed: ", filtered_dirs)
-    print("If you want to remove any of it, put on EXCLUDE_DIR.\n")
-
-    root_files = list(path.glob("**.md"))
     md_files = []
-
-    # Collect files on the root path
-    md_files.extend(root_files)
-
     # Iterate over all directories and find .md files:
     for dirs in filtered_dirs:
         # Collect files on selected subdirectories
-        files = list(Path(path / dirs).rglob("**.md"))
-
+        files = list(Path(path / dirs).glob("*.md"))
         # Put all files collected here
         md_files.extend(files)
 
+
     return filtered_dirs, md_files
 
-def sub_json(dry_run: bool):
-    return 0
-
-def sub_reconstruct(file, header, body):
+def sub_reconstruct(file, header, body, frontmatter: bool) -> None:
     """Reconstruct the file: New header + Content"""
+
     with file.open(mode = 'w') as f:
-        for header_lines in header:
-            f.write(header_lines)
 
-        for body_lines in body:
-            f.write(body_lines)
+        if frontmatter:
+            # Open frontmatter
+            f.write('---\n')
+            for key, values in header.items():
+                f.write(f"{key}: {values}\n")
+            # Close frontmatter
+            f.write('---\n')
 
-    return file
+        f.writelines(body)
 
-def metadata_remover(files: list):
-    """Read all meta data from the folders."""
-    names = map(str(), files)
-    print(names)
-    for file in names:
-        header_lines = []
-        body_lines = []
-        with file.open() as f:
-            for line in f:
-                if line.startswith('---'):
-                    header_lines.append(('---' + '\n'))
-                    # Collect the header
-                    while line.startswith('---') == False:
-                        header_lines.append(line + '\n')
+def sub_frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
+    """Collect frontmatter from a .md file"""
 
-                    # Close frontmatter
-                    header_lines.append(('---' + '\n'))
+    header_lines = {}
+    body_lines = []
 
+    # flow controllers
+    inside_frontmatter = False
+    has_frontmatter = False
+
+    with file.open() as f:
+        for line in f:
+            # Remove all blankspaces
+            stripped_line = line.strip()
+            # Verify if is in frontmatter
+            if stripped_line == '---':
+                # if there is frontmatter, it will turn on.
+                if not inside_frontmatter:
+                    inside_frontmatter = True
+                    has_frontmatter = True
+                    continue
                 else:
-                    # If there is no front matter, or if already collected, get the content
-                    body_lines.append(line + '\n')
+                # if already turned on: it will turn off.
+                    inside_frontmatter = False
+                    continue
+                
+            if inside_frontmatter:
+                key, content = stripped_line.split(':', 1)
+                header_lines[key.strip()] = content.strip()
+            else:
+                body_lines.append(line)
+    
+    return file, header_lines, body_lines, has_frontmatter
 
-        print(reconstruct(file, header_lines, body_lines))
-        print("=================")
-        file.read_text()
-        print("=================")
+def metadata_remover(key: str, files: list) -> dict:
+    """Remove one key of the frontmatter and its value."""
 
-    return 0
+    changed_files = len(files)
 
-def metadata_changer(files: list):
-    """Read all meta data from the folders."""
-    # Iterate over FILES, so we will need md files because has full path
+    previous_delete_content = {}
+
     for file in files:
-        with file.open() as f:
-            for line in f:
-                if line.startswith('---'):
-                    print()
+        file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
+
+        # Save content for log:
+        previous_delete_content[key] = header_lines[key]
+
+        # Create a new header_lines for manipulation
+        new_header = header_lines
+
+        try:
+            new_header.pop(key)
+            print(f"{changed_files} was changed. {key} was removed from the frontmatter.\n")
+
+        except KeyError as e:
+            print(f"A error has ocurred: {e} not found in {file}")
+            changed_files = changed_files - 1
+
+        sub_reconstruct(file, new_header, body_lines, has_frontmatter)
+
+    # AINDA FALTA A INTERGAÇÂO COM O JSON MAKER
+    # PRECISO PEGAR O VALOR ANTIGO DO REMOVE E ARMAZENAR EM ALGUM LUGAR
+
+    return previous_delete_content
+
+def metadata_changer(key: str, content: str, files: list) -> dict:
+    """Change the value of one key of the frontmatter."""
+
+    changed_files = len(files)
+
+    previous_change_content = {}
+    new_change_content = {}
+
+    for file in files:
+        file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
+
+        # Save content for log:
+        previous_change_content[key] = header_lines[key]
+
+        # Create a new header_lines for manipulation 
+        new_header = header_lines
+
+        try:
+            new_header[key] = content
+            new_change_content[key] = content
+            print(f"{changed_files} was changed. {key} value was changed to {content}.\n")
+
+        except KeyError as e:
+            print(f"Cannot change the {key} value: {e} not found in {file}")
+            changed_files = changed_files - 1
+
+        sub_reconstruct(file, new_header, body_lines, has_frontmatter)
+
+    # AINDA FALTA A INTERGAÇÂO COM O JSON MAKER
+    # PRECISO PEGAR O VALOR ANTIGO DE ALTERAR ANTES DA ITERAÇÃO E ARMAZENAR EM ALGUM LUGAR
+
+    return previous_change_content, new_change_content
+
+def sub_json_maker(files: list) -> dict:
+    """Create a JSON file with all alterations"""
+    json_complete = []
+
+    for file in files:
+
+        json_template = {
+            "title": file.name,
+            "path": file.as_posix(),
+            "mod": "NOT YET"
+        }
+
+        json_complete.append(json_template)
+
+    json_file_name = f'changes_{datetime.now()}.json'
+
+    json_path = Path('change_logs') / json_file_name
+
+    json_path.parent.mkdir(parents = True, exist_ok = True)
+
+    #JSON dumps uses ensure_ascii = True by default, which encode special char: ~, ç ...
+    #This makes JSON flexible to system that can only read ASCII
+    #If you want to enable 
+
+    with open(json_path, 'w', encoding='utf8') as json_file:
+        # ensure_ascii=False
+        json.dump(json_complete, json_file, indent = 4)
+
+    print(f"A JSON file created at: {json_path}")
+
+    return json_complete
 
 
-    return 0
+

@@ -4,7 +4,7 @@ from config import BACKUP_PATH
 from typing import List, Tuple
 from datetime import datetime
 
-from config import PATH, EXCLUDE_DIRS
+from config import PATH, EXCLUDE_DIRS, DRY_RUN_MODE
 
 
 def sub_proceed(line: str) -> bool:
@@ -116,17 +116,21 @@ def sub_frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
     
     return file, header_lines, body_lines, has_frontmatter
 
-def metadata_remover(key: str, files: list) -> dict:
+def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     """Remove one key of the frontmatter and its value."""
-
     changed_files = len(files)
 
     previous_delete_content = {}
+    after_delete_content = {}
 
     for file in files:
         file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
 
         # Save content for log:
+        file_key = file.as_posix()
+        old_value = header_lines.get(key, "")
+
+
         previous_delete_content[key] = header_lines[key]
 
         # Create a new header_lines for manipulation
@@ -134,83 +138,122 @@ def metadata_remover(key: str, files: list) -> dict:
 
         try:
             new_header.pop(key)
+            after_delete_content[file_key] = old_value
+
             print(f"{changed_files} was changed. {key} was removed from the frontmatter.\n")
 
         except KeyError as e:
+            # It will capture failed ones.
+            after_delete_content[key] = ""
+
             print(f"A error has ocurred: {e} not found in {file}")
             changed_files = changed_files - 1
 
+    # DRY RUN WILL DEFINE TO REWRITE OR NOT THE FILES
+    if dry_run:
+        return previous_delete_content, after_delete_content
+    else:
         sub_reconstruct(file, new_header, body_lines, has_frontmatter)
-
-    # AINDA FALTA A INTERGAÇÂO COM O JSON MAKER
-    # PRECISO PEGAR O VALOR ANTIGO DO REMOVE E ARMAZENAR EM ALGUM LUGAR
-
-    return previous_delete_content
-
-def metadata_changer(key: str, content: str, files: list) -> dict:
+        return previous_delete_content
+    
+def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     """Change the value of one key of the frontmatter."""
 
     changed_files = len(files)
 
     previous_change_content = {}
-    new_change_content = {}
+    after_change_content = {}
 
     for file in files:
         file, header_lines, body_lines, has_frontmatter = sub_frontmatter_collector(file)
 
         # Save content for log:
-        previous_change_content[key] = header_lines[key]
+        file_key = file.as_posix()
+        old_value = header_lines.get(key, "")
+        new_value = header_lines[key]
+
+        previous_change_content[file_key] = old_value 
 
         # Create a new header_lines for manipulation 
         new_header = header_lines
 
         try:
             new_header[key] = content
-            new_change_content[key] = content
+            after_change_content[file_key] = new_value
             print(f"{changed_files} was changed. {key} value was changed to {content}.\n")
 
         except KeyError as e:
+            # It will capture failed ones.
+            after_change_content[file_key] = new_value
             print(f"Cannot change the {key} value: {e} not found in {file}")
             changed_files = changed_files - 1
 
+    if dry_run:
+        return previous_change_content, after_change_content
+    else:
         sub_reconstruct(file, new_header, body_lines, has_frontmatter)
+        return previous_change_content, after_change_content  
 
-    # AINDA FALTA A INTERGAÇÂO COM O JSON MAKER
-    # PRECISO PEGAR O VALOR ANTIGO DE ALTERAR ANTES DA ITERAÇÃO E ARMAZENAR EM ALGUM LUGAR
-
-    return previous_change_content, new_change_content
-
-def sub_json_maker(files: list) -> dict:
-    """Create a JSON file with all alterations"""
+def sub_json_templater(files: list) -> list:
+    """Aplly template for files in json output"""
     json_complete = []
 
     for file in files:
-
         json_template = {
             "title": file.name,
             "path": file.as_posix(),
-            "mod": "NOT YET"
-        }
-
+            }
+        
         json_complete.append(json_template)
+    
+    return json_complete
 
-    json_file_name = f'changes_{datetime.now()}.json'
+def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
+    """Create a JSON file with all alterations"""
+
+    json_list = sub_json_templater(files)
+
+    print("==========DEBUB SECTION==========")
+    print(previous)
+    print("==========DEBUB SECTION==========")
+
+    for entry, file in zip(json_list, files):
+
+        file_key = file.as_posix()
+
+        old_value = previous.get(file_key, "")
+        new_value = new.get(file_key, "")
+
+        entry["old"] = f"{old_value}"
+        entry["new"] = f"{new_value}"
+    
+    if dry_run:
+        json_file_name = f'dry-run_{datetime.now()}.json'
+    
+    else:
+        json_file_name = f'changes_{datetime.now()}.json'
 
     json_path = Path('change_logs') / json_file_name
-
     json_path.parent.mkdir(parents = True, exist_ok = True)
 
     #JSON dumps uses ensure_ascii = True by default, which encode special char: ~, ç ...
     #This makes JSON flexible to system that can only read ASCII
-    #If you want to enable 
+    #If you want to enable do ensure_ascii = False
 
     with open(json_path, 'w', encoding='utf8') as json_file:
-        # ensure_ascii=False
-        json.dump(json_complete, json_file, indent = 4)
+        # ensure_ascii=False 
+        json.dump(json_list, json_file, indent = 4, ensure_ascii=False)
 
     print(f"A JSON file created at: {json_path}")
 
-    return json_complete
+    return json_list
 
 
+#################### DEBUG ###########################
+files = [Path('teste1.md'), Path('teste2.md')]
+old, new = metadata_changer('alterar', 'ALTEROURS', files, DRY_RUN_MODE)
 
+for i, j in old.items():
+    print(i,j)
+
+#json_maker(files, old, new, DRY_RUN_MODE)

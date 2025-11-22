@@ -14,10 +14,13 @@ BACKUP_PATH = Path('.') / 'BACKUP'
 # If you want to exclude a directory from being touched, move it to backup:
 # Secret directories (starts with a .) will be ignored by default.
 # Backup is EXCLUDED by default.
-EXCLUDE_DIRS = ["."]
-
+EXCLUDE_DIRS = [
+    'VAULT/_Zettelkasten',
+    'change_logs',
+    'VAULT'
+]
 
 # DRY RUN prevents any alteration on files
 # FALSE by default for secure, change to TRUE to activate the script
 
-DRY_RUN_MODE = False
+DRY_RUN_MODE = True

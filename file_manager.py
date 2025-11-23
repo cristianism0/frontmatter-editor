@@ -4,8 +4,6 @@ from config import BACKUP_PATH
 from typing import List, Tuple
 from datetime import datetime
 
-from config import PATH, EXCLUDE_DIRS, DRY_RUN_MODE
-
 
 def sub_proceed(line: str) -> bool:
     """Ask for proceed a task"""
@@ -128,34 +126,36 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
 
         # Save content for log:
         file_key = file.as_posix()
-        old_value = header_lines.get(key, "")
+        old_value = header_lines.get(key)
 
+        print(old_value)
 
-        previous_delete_content[key] = header_lines[key]
+        previous_delete_content[file_key] = old_value
 
         # Create a new header_lines for manipulation
-        new_header = header_lines
+        new_header = header_lines.copy()
 
         try:
+            #remove the key gaved on the new header
             new_header.pop(key)
+            print(f"{changed_files} was changed. {key} with was removed from the frontmatter.\n")
+        
+            # For log -> Maintain the old value because if was deleted
             after_delete_content[file_key] = old_value
 
-            print(f"{changed_files} was changed. {key} was removed from the frontmatter.\n")
-
-        except KeyError as e:
+        except Exception as e:
             # It will capture failed ones.
-            after_delete_content[key] = ""
-
             print(f"A error has ocurred: {e} not found in {file}")
             changed_files = changed_files - 1
 
-    # DRY RUN WILL DEFINE TO REWRITE OR NOT THE FILES
-    if dry_run:
-        return previous_delete_content, after_delete_content
-    else:
-        file_reconstruct(file, new_header, body_lines, has_frontmatter)
-        return previous_delete_content
-    
+            #for log
+            after_delete_content[file_key] = "!!!FAILED!!!"
+
+        if not dry_run:
+            file_reconstruct(file, new_header, body_lines, has_frontmatter)
+ 
+    return previous_delete_content, after_delete_content
+
 def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     """Change the value of one key of the frontmatter."""
 
@@ -169,30 +169,75 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
 
         # Save content for log:
         file_key = file.as_posix()
-        old_value = header_lines.get(key, "")
-        new_value = header_lines[key]
+        old_value = header_lines.get(key)      #the value with the key that i gave
+        new_value = content                    #new value is the content
 
         previous_change_content[file_key] = old_value 
 
         # Create a new header_lines for manipulation 
-        new_header = header_lines
+        new_header = header_lines.copy()
 
         try:
             new_header[key] = content
+
+            # for log
             after_change_content[file_key] = new_value
             print(f"{changed_files} was changed. {key} value was changed to {content}.\n")
 
-        except KeyError as e:
+        except Exception as e:
             # It will capture failed ones.
-            after_change_content[file_key] = new_value
             print(f"Cannot change the {key} value: {e} not found in {file}")
             changed_files = changed_files - 1
 
-    if dry_run:
-        return previous_change_content, after_change_content
-    else:
-        file_reconstruct(file, new_header, body_lines, has_frontmatter)
-        return previous_change_content, after_change_content  
+            # for log
+            after_change_content[file_key] = old_value
+
+        if not dry_run:
+            file_reconstruct(file, new_header, body_lines, has_frontmatter)
+ 
+    return previous_change_content, after_change_content
+
+def metadata_add(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
+    """Add a value on the frontmatter of each file."""
+
+    changed_files = len(files)
+
+    previous_add_content = {}
+    after_add_content = {}
+
+    for file in files:
+        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
+
+        # Save content for log:
+        file_key = file.as_posix()
+        old_value = header_lines.get(key, None)  #-> Returns None
+        new_value = content
+
+        previous_add_content[file_key] = old_value 
+
+        # Create a new header_lines for manipulation 
+        new_header = header_lines.copy()
+
+        try:
+            # add the new value on the new header
+            new_header[key] = content
+            print(f"{changed_files} was changed. {key} value {content} was added to the frontmatter.\n")
+
+            #for log
+            after_add_content[file_key] = content
+
+        except KeyError as e:
+            # It will capture failed ones.
+            print(f"Cannot change the {key} value: {e} not found in {file}")
+            changed_files = changed_files - 1
+
+            # for log
+            after_add_content[file_key] = content
+
+        if not dry_run:
+            file_reconstruct(file, new_header, body_lines, has_frontmatter)
+ 
+    return previous_add_content, after_add_content
 
 def json_templater(files: list) -> list:
     """Aplly template for files in json output"""
@@ -213,19 +258,15 @@ def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
 
     json_list = json_templater(files)
 
-    print("==========DEBUB SECTION==========")
-    print(previous)
-    print("==========DEBUB SECTION==========")
-
     for entry, file in zip(json_list, files):
 
         file_key = file.as_posix()
 
-        old_value = previous.get(file_key, "")
-        new_value = new.get(file_key, "")
+        old_value = previous.get(file_key)
+        new_value = new.get(file_key)
 
-        entry["old"] = f"{old_value}"
-        entry["new"] = f"{new_value}"
+        entry["old_value"] = f"{old_value}"
+        entry["new_value"] = f"{new_value}"
     
     if dry_run:
         json_file_name = f'dry-run_{datetime.now()}.json'
@@ -247,13 +288,3 @@ def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
     print(f"A JSON file created at: {json_path}")
 
     return json_list
-
-
-#################### DEBUG ###########################
-files = [Path('teste1.md'), Path('teste2.md')]
-old, new = metadata_changer('alterar', 'ALTEROURS', files, DRY_RUN_MODE)
-
-for i, j in old.items():
-    print(i,j)
-
-#json_maker(files, old, new, DRY_RUN_MODE)

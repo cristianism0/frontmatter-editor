@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+ 
 from pathlib import Path, PurePath
 import json
 
@@ -14,7 +14,8 @@ def main():
     try:
         dirs, files = collect_dirs_and_files(
             path = PATH,
-            exclude_dirs = EXCLUDE_DIRS
+            exclude_dirs = EXCLUDE_DIRS,
+            backup_path = BACKUP_PATH
         )
 
         dir_name = [d.name for d in dirs]
@@ -30,21 +31,27 @@ def main():
 
     # Create a BACKUP folder
     try: 
-        if CREATE_BACKUP:
-            if Path(BACKUP_PATH).exists():
-                print("BACKUP directory already exists!\n")
-                print("WARNING: if there's files with the same name, they will be overwritten.")
-            else:    
-                BACKUP_PATH.mkdir()
-                print(f"A BACKUP directory was created at: {str(BACKUP_PATH)}\n")
+        if not DRY_RUN_MODE:
+            if CREATE_BACKUP:
+                if Path(BACKUP_PATH).exists():
+                    print("BACKUP directory already exists!\n")
+                    print("WARNING: if there's files with the same name, they will be overwritten.")
+                else:    
+                    BACKUP_PATH.mkdir()
+                    print(f"A BACKUP directory was created at: {str(BACKUP_PATH)}\n")
 
-            backup_dir(
-                MD_files= files,
-                backup_path = BACKUP_PATH,)
+                backup_dir(
+                    MD_files= files,
+                    backup_path = BACKUP_PATH,
+                    ROOT_PATH =PATH)
 
-            print(f"BACKUP done. Check before continue at: {BACKUP_PATH}")
+                print(f"BACKUP done. Check before continue at: {BACKUP_PATH}")
+            else:
+                print("\nBackup directory was NOT created.")
+
         else:
-            print("\nBackup directory was NOT created.")
+            print("\nBackup directory was NOT created. DRY-RUN is TRUE.")
+
 
     except Exception as e:
         print(f"An error ocurred during BACKUP creation: {e}")
@@ -53,9 +60,7 @@ def main():
             return []
         
     # Start the script
-    print("#######################")
     print("\nSTARTING THE SCRIPT\n")
-    print("#######################")
 
     while True:
         print("Select operation:")
@@ -79,10 +84,6 @@ def main():
             # REMOVE FRONT MATTER
                 print("INFO: The key is the word before ':'. IT'S CASE SENSITIVE!\n")
                 key = str(input("Type the key that you want to delete: "))
-
-
-
-
 
 
 if __name__ == '__main__':

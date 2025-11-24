@@ -1,8 +1,7 @@
 from pathlib import Path, PurePath
-import json
-from config import BACKUP_PATH
 from typing import List, Tuple
 from datetime import datetime
+import json
 
 
 def sub_proceed(line: str) -> bool:
@@ -13,52 +12,55 @@ def sub_proceed(line: str) -> bool:
     else:
         return False
 
-def backup_dir(MD_files: list, backup_path: Path) -> None:
+def backup_dir(files: list, backup_path: Path, ROOT_PATH: Path) -> None:
     """Create a BACKUP directory on the path."""
     # It will create a parent directory for each file for better organization.
-    for files in MD_files:
-        path = PurePath(files)
-        parent_path = backup_path / path.parent 
+    for files in files:
+        file_path = Path(files)
+        relative = file_path.relative_to(ROOT_PATH)
+
+        parent_path = backup_path / relative.parent 
         parent_path.mkdir(exist_ok= True, parents = True)
         # It will copy a file in its respective parent name.
         # If the MD is on the root, it will move to backup.
-        if path.parent == PurePath():
-            files.copy_into(backup_path, preserve_metadata = True)
-        else:
-            files.copy_into(parent_path, preserve_metadata = True)
-    
+        file_path.copy_into(parent_path)
+
+        # if path.parent == Path():
+        #     files.copy_into(backup_path, preserve_metadata = True)
+        # else:
+        #     files.copy_into(parent_path, preserve_metadata = True)
     
     return None
 
-def filter_dirs(path: Path, exclude_dirs: list, backup_path: Path = BACKUP_PATH) -> List[Path]:
+def filter_dirs(path: Path, exclude_dirs: list, backup_path: Path) -> List[Path]:
     """Filter the directories: Taking out hidden and EXCLUDED"""
 
     # Create path for each item on exclude_dirs
-    excluded_paths = [Path(dirs) for dirs in exclude_dirs]
+    excluded_paths = [path / dirs for dirs in exclude_dirs]
 
+    # Function that chech if each path is relative to another -> avoid childrens of excluded dirs.
     fun_match = lambda d: any(d.is_relative_to(expath) for expath in excluded_paths)
 
     filtered_dirs = [
         f for f in path.glob('**/*')          # Recursive search for dirs
         if f.is_dir()
         and not f.is_relative_to(backup_path)
-        and not f.full_match('.*')
-        and not f.full_match('.*/**')         # Recursive search for files inside hidden dirs
+        and not f.name.startswith('.')
         and not fun_match(f)
     ]
 
     return filtered_dirs
 
-def collect_dirs_and_files(path: Path, exclude_dirs: list ) -> Tuple[List[Path], list]:
+def collect_dirs_and_files(path: Path, exclude_dirs: list, backup_path: Path ) -> Tuple[List[Path], list]:
     """Collect all subdirectories from path and all md files on each of it."""
     
-    filtered_dirs = filter_dirs(path, exclude_dirs)
+    filtered_dirs = filter_dirs(path, exclude_dirs, backup_path)
 
     md_files = []
     # Iterate over all directories and find .md files:
     for dirs in filtered_dirs:
         # Collect files on selected subdirectories
-        files = list(Path(path / dirs).glob("*.md"))
+        files = list((path / dirs).glob("*.md"))
         # Put all files collected here
         md_files.extend(files)
 
@@ -220,11 +222,11 @@ def metadata_add(key: str, content: str, files: list, dry_run: bool) -> Tuple[di
 
         try:
             # add the new value on the new header
-            new_header[key] = content
+            new_header[key] = new_value
             print(f"{changed_files} was changed. {key} value {content} was added to the frontmatter.\n")
 
             #for log
-            after_add_content[file_key] = content
+            after_add_content[file_key] = new_value
 
         except KeyError as e:
             # It will capture failed ones.

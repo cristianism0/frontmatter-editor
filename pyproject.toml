@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Leitor e Alterador de frontmatter de arquivos markdown."
 readme = "README.md"
 requires-python = ">=3.14"
+dependencies = [
+    "pyaml>=25.7.0",
+]
 [tool.pytest.ini_options]
 pythonpath = [
   "."

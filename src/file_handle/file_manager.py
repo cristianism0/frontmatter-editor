@@ -1,60 +1,12 @@
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import List, Tuple
-from datetime import datetime
-import json
+import src.utils as utils
 
-
-def sub_proceed(line: str) -> bool:
-    """Ask for proceed a task"""
-    output = str(input(line)).lower().strip()
-    if output == 'y':
-        return True
-    else:
-        return False
-
-def backup_dir(files: list, backup_path: Path, ROOT_PATH: Path) -> None:
-    """Create a BACKUP directory on the path."""
-    # It will create a parent directory for each file for better organization.
-    for files in files:
-        file_path = Path(files)
-        relative = file_path.relative_to(ROOT_PATH)
-
-        parent_path = backup_path / relative.parent 
-        parent_path.mkdir(exist_ok= True, parents = True)
-        # It will copy a file in its respective parent name.
-        # If the MD is on the root, it will move to backup.
-        file_path.copy_into(parent_path)
-
-        # if path.parent == Path():
-        #     files.copy_into(backup_path, preserve_metadata = True)
-        # else:
-        #     files.copy_into(parent_path, preserve_metadata = True)
-    
-    return None
-
-def filter_dirs(path: Path, exclude_dirs: list, backup_path: Path) -> List[Path]:
-    """Filter the directories: Taking out hidden and EXCLUDED"""
-
-    # Create path for each item on exclude_dirs
-    excluded_paths = [path / dirs for dirs in exclude_dirs]
-
-    # Function that chech if each path is relative to another -> avoid childrens of excluded dirs.
-    fun_match = lambda d: any(d.is_relative_to(expath) for expath in excluded_paths)
-
-    filtered_dirs = [
-        f for f in path.glob('**/*')          # Recursive search for dirs
-        if f.is_dir()
-        and not f.is_relative_to(backup_path)
-        and not f.name.startswith('.')
-        and not fun_match(f)
-    ]
-
-    return filtered_dirs
 
 def collect_dirs_and_files(path: Path, exclude_dirs: list, backup_path: Path ) -> Tuple[List[Path], list]:
     """Collect all subdirectories from path and all md files on each of it."""
     
-    filtered_dirs = filter_dirs(path, exclude_dirs, backup_path)
+    filtered_dirs = utils.filter_dirs(path, exclude_dirs, backup_path)
 
     md_files = []
     # Iterate over all directories and find .md files:
@@ -82,7 +34,7 @@ def file_reconstruct(file, header, body, frontmatter: bool) -> None:
 
         f.writelines(body)
 
-def frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
+def frontmatter_collector(file) -> Tuple[dict, dict, bool]:
     """Collect frontmatter from a .md file"""
 
     header_lines = {}
@@ -93,28 +45,47 @@ def frontmatter_collector(file) -> Tuple[any, dict, dict, bool]:
     has_frontmatter = False
 
     with file.open() as f:
-        for line in f:
-            # Remove all blankspaces
-            stripped_line = line.strip()
-            # Verify if is in frontmatter
-            if stripped_line == '---':
-                # if there is frontmatter, it will turn on.
-                if not inside_frontmatter:
-                    inside_frontmatter = True
-                    has_frontmatter = True
-                    continue
+        lines = f.readlines()
+        #Look if there is frontmatter
+        if lines[0].strip().startswith('---'):
+            has_frontmatter = True
+            inside_frontmatter = True
+
+        for l in lines[1:]:
+            print(f"has_frontmatter value {has_frontmatter}")
+            print(f"inside_frontmatter value {inside_frontmatter}\n")
+            if has_frontmatter and inside_frontmatter:
+                if not l.strip().startswith('---'):
+                    try:
+                        key, content = l.split(':', 1)
+                        header_lines[key] = content
+                    except:
+                        # TODO -> FIX IT
+                        # Thinked of: create a new module with parsing containing
+                        # this fuction with separated parts to not become so overload
+                        # it will because a i have to track lists and multiline comments
+                        # broken yaml 
+                        # TODO 
+                        # The logic i thinked is: 
+                        # put a position value to track line pos and compare if starts a multiline or list
+                        # track the list if the stripped line endswith(':') AND if the pos(lis+1) contain
+                        # line.startwith('-'), if not. i will armazena with: key '\n'.
+                        # identify if there is already a key, ex: if there is 2 tags, raise a error and skip 
+                        # the file as it was.
+
+                        # if there is any error, copy the entire lines in body and send again.
+                        # for file reconstruct, its good to know if there's a error or not
+                        # if there is a error, it will take the same parte as NOT has frontmatter and will copy
+                        #the entire file
+
+                        continue
                 else:
-                # if already turned on: it will turn off.
+                    #close frontmatter
                     inside_frontmatter = False
-                    continue
-                
-            if inside_frontmatter:
-                key, content = stripped_line.split(':', 1)
-                header_lines[key.strip()] = content.strip()
             else:
-                body_lines.append(line)
-    
-    return file, header_lines, body_lines, has_frontmatter
+                body_lines.append(l)
+
+    return header_lines, body_lines, has_frontmatter
 
 def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     """Remove one key of the frontmatter and its value."""
@@ -124,13 +95,11 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     after_delete_content = {}
 
     for file in files:
-        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
+        header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
         # Save content for log:
         file_key = file.as_posix()
         old_value = header_lines.get(key)
-
-        print(old_value)
 
         previous_delete_content[file_key] = old_value
 
@@ -138,7 +107,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
         new_header = header_lines.copy()
 
         try:
-            #remove the key gaved on the new header
+            #delete the key provided in the new header
             new_header.pop(key)
             print(f"{changed_files} was changed. {key} with was removed from the frontmatter.\n")
         
@@ -146,13 +115,13 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
             after_delete_content[file_key] = old_value
 
         except Exception as e:
-            # It will capture failed ones.
-            print(f"A error has ocurred: {e} not found in {file}")
+            # It will capture failured.
+            print(f"A error has ocurred on file: {file}. ERROR: {e} ")
             changed_files = changed_files - 1
 
             #for log
             after_delete_content[file_key] = "!!!FAILED!!!"
-
+            continue
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
@@ -167,7 +136,7 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
     after_change_content = {}
 
     for file in files:
-        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
+        header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
         # Save content for log:
         file_key = file.as_posix()
@@ -187,13 +156,13 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
             print(f"{changed_files} was changed. {key} value was changed to {content}.\n")
 
         except Exception as e:
-            # It will capture failed ones.
+            # It will capture failured.
             print(f"Cannot change the {key} value: {e} not found in {file}")
             changed_files = changed_files - 1
 
             # for log
             after_change_content[file_key] = old_value
-
+            continue
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
@@ -208,7 +177,7 @@ def metadata_add(key: str, content: str, files: list, dry_run: bool) -> Tuple[di
     after_add_content = {}
 
     for file in files:
-        file, header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
+        header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
         # Save content for log:
         file_key = file.as_posix()
@@ -229,64 +198,15 @@ def metadata_add(key: str, content: str, files: list, dry_run: bool) -> Tuple[di
             after_add_content[file_key] = new_value
 
         except KeyError as e:
-            # It will capture failed ones.
+            # It will capture failured.
             print(f"Cannot change the {key} value: {e} not found in {file}")
             changed_files = changed_files - 1
 
             # for log
             after_add_content[file_key] = content
-
+            continue
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
     return previous_add_content, after_add_content
 
-def json_templater(files: list) -> list:
-    """Aplly template for files in json output"""
-    json_complete = []
-
-    for file in files:
-        json_template = {
-            "title": file.name,
-            "path": file.as_posix(),
-            }
-        
-        json_complete.append(json_template)
-    
-    return json_complete
-
-def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
-    """Create a JSON file with all alterations"""
-
-    json_list = json_templater(files)
-
-    for entry, file in zip(json_list, files):
-
-        file_key = file.as_posix()
-
-        old_value = previous.get(file_key)
-        new_value = new.get(file_key)
-
-        entry["old_value"] = f"{old_value}"
-        entry["new_value"] = f"{new_value}"
-    
-    if dry_run:
-        json_file_name = f'dry-run_{datetime.now()}.json'
-    
-    else:
-        json_file_name = f'changes_{datetime.now()}.json'
-
-    json_path = Path('change_logs') / json_file_name
-    json_path.parent.mkdir(parents = True, exist_ok = True)
-
-    #JSON dumps uses ensure_ascii = True by default, which encode special char: ~, ç ...
-    #This makes JSON flexible to system that can only read ASCII
-    #If you want to enable do ensure_ascii = False
-
-    with open(json_path, 'w', encoding='utf8') as json_file:
-        # ensure_ascii=False 
-        json.dump(json_list, json_file, indent = 4, ensure_ascii=False)
-
-    print(f"A JSON file created at: {json_path}")
-
-    return json_list

@@ -1,6 +1,14 @@
 import pytest
-from file_manager import backup_dir, filter_dirs, collect_dirs_and_files, file_reconstruct, frontmatter_collector
-from file_manager import  metadata_remover, metadata_add, metadata_changer, json_templater, json_maker
+from src.file_handle.file_manager import backup_dir, filter_dirs, collect_dirs_and_files, file_reconstruct, frontmatter_collector
+from src.file_handle.file_manager import  metadata_remover, metadata_add, metadata_changer, json_templater, json_maker
+
+# TODO: file_reconstruct, frontmatter_collector
+# LOW-LEVEL Func: file_reconstruct
+
+# PRIORITY: HARDESTS
+# TODO: metadata_remover, metadata_add, metadata_changer, json_templater, json_maker
+# FEATURES TO LOOK -> Error handling -> bad frontmatter, etc...
+
 
 # PASSED
 def test_backup_dir(tmp_path):
@@ -110,10 +118,7 @@ def test_collect_dirs_and_files(tmp_path):
     assert file1 in files
     assert excluded not in files
 
+# NOT PASSED
 
 
-# TODO: file_reconstruct, frontmatter_collector
 
-# PRIORITY: HARDESTS
-# TODO: metadata_remover, metadata_add, metadata_changer, json_templater, json_maker
-# FEATURES TO LOOK -> Error handling -> bad frontmatter, etc...

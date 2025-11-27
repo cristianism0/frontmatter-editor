@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
  
-from pathlib import Path, PurePath
-import json
+from pathlib import Path
 
 from config import PATH, CREATE_BACKUP, BACKUP_PATH, EXCLUDE_DIRS, DRY_RUN_MODE
-from file_manager import backup_dir, collect_dirs_and_files, metadata_remover, metadata_changer
-from file_manager import json_maker, sub_proceed
+from src.utils import sub_proceed, backup_dir, json_maker
+from src.file_handle.file_manager import backup_dir, collect_dirs_and_files, metadata_remover, metadata_changer
 
 def main():
     print("FRONTMATTER CHANGER\n")

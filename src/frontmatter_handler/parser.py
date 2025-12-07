@@ -1,25 +1,32 @@
 import yaml
 from pathlib import Path
+import re
 
-file1 = Path('teste_yaml.md')
-malformed = Path('malformed.md')
 
 
 def safe_load_frontmatter(file):
     """Safe load the frontmatter using PyYAML"""
 
-    with file.open() as f:
-        try:
-            front = yaml.safe_load(f)
-            print(yaml.dump(front))
+    pattern = r"^---\s*\n(.*?)\n---\s*\n(.*)$"
 
-        # Mal formed YAML -> return the entire file for write again    
-        except:
-            return file    
+    # ^---\s+ -> starts with --- and can have whitespaces
+    #(.*?) -> get everything (non-greedy)
+    # then close the match and get all the file content.
+
+    raw_content = file.read_text(encoding='utf8')
+
+    match = re.search(pattern, raw_content, re.DOTALL | re.MULTILINE)
+
+    with file.open() as stream:
+        try:
+            front = yaml.safe_load_all(stream)
+            print(yaml.dump_all(front))   
+        # Malformed YAML -> return the entire file for write again    
+        
+        except Exception as e:
+            print(f'deu erro: {e}')
+            return file
 
     return 0
-
-print(f"{safe_load_frontmatter(malformed)} malformed")
-safe_load_frontmatter(file1)
 
 

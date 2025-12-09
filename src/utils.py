@@ -23,7 +23,7 @@ def backup_dir(files: list, backup_path: Path, ROOT_PATH: Path) -> None:
         parent_path.mkdir(exist_ok= True, parents = True)
         # It will copy a file in its respective parent name.
         # If the MD is on the root, it will move to backup.
-        file_path.copy_into(parent_path)
+        file_path.copy_into(parent_path, preserve_metadata=True)
 
         # if path.parent == Path():
         #     files.copy_into(backup_path, preserve_metadata = True)

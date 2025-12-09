@@ -60,23 +60,22 @@ def frontmatter_collector(file) -> Tuple[dict, dict, bool]:
                         key, content = l.split(':', 1)
                         header_lines[key] = content
                     except:
-                        # TODO -> FIX IT
-                        # Thinked of: create a new module with parsing containing
-                        # this fuction with separated parts to not become so overload
-                        # it will because a i have to track lists and multiline comments
-                        # broken yaml 
-                        # TODO 
-                        # The logic i thinked is: 
-                        # put a position value to track line pos and compare if starts a multiline or list
-                        # track the list if the stripped line endswith(':') AND if the pos(lis+1) contain
-                        # line.startwith('-'), if not. i will armazena with: key '\n'.
-                        # identify if there is already a key, ex: if there is 2 tags, raise a error and skip 
-                        # the file as it was.
-
-                        # if there is any error, copy the entire lines in body and send again.
-                        # for file reconstruct, its good to know if there's a error or not
-                        # if there is a error, it will take the same parte as NOT has frontmatter and will copy
-                        #the entire file
+    # TODO -> FIX IT
+    # Thinked of: create a new module with parsing containing
+    # this fuction with separated parts to not become so overload
+    # it will because a i have to track lists and multiline comments
+    # broken yaml 
+    # TODO 
+    # The logic i thinked is: 
+    # put a position value to track line pos and compare if starts a multiline or list
+    # track the list if the stripped line endswith(':') AND if the pos(lis+1) contain
+    # line.startwith('-'), if not. i will armazena with: key '\n'.
+    # identify if there is already a key, ex: if there is 2 tags, raise a error and skip 
+    # the file as it 
+    # if there is any error, copy the entire lines in body and send again.
+    # for file reconstruct, its good to know if there's a error or not
+    # if there is a error, it will take the same parte as NOT has frontmatter and will copy
+    #the entire file
 
                         continue
                 else:
@@ -89,14 +88,22 @@ def frontmatter_collector(file) -> Tuple[dict, dict, bool]:
 
 def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
     """Remove one key of the frontmatter and its value."""
-    changed_files = len(files)
 
     previous_delete_content = {}
     after_delete_content = {}
 
     for file in files:
-        header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
 
+        try:
+            # collect the file content
+            header_lines, body_lines, has_frontmatter = frontmatter_collector(file)
+        except:
+            print(f"{file} was not changed.")
+            if not dry_run:
+                file_reconstruct(file, new_header, body_lines, has_frontmatter)
+            else:
+                continue
+            
         # Save content for log:
         file_key = file.as_posix()
         old_value = header_lines.get(key)
@@ -122,6 +129,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
             #for log
             after_delete_content[file_key] = "!!!FAILED!!!"
             continue
+
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  

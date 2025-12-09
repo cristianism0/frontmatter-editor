@@ -6,11 +6,14 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "pyaml>=25.7.0",
+    "pytest>=9.0.2",
 ]
+
 [tool.pytest.ini_options]
 pythonpath = [
   "."
 ]
+
 dependencies = [
     "pytest>=9.0.1",
     "pytest-mock>=3.15.1",

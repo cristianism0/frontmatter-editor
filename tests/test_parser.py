@@ -1,10 +1,7 @@
 from src.frontmatter_handler.parser import load_frontmatter
 
-def test_load_frontmatter(tmp_path):
+def files_samples(tmp_path):
     import textwrap
-    """
-    Test the load frontmatter in different scenarios
-    """
     good = tmp_path / "good.md"
     good.write_text(textwrap.dedent("""
         ---
@@ -52,6 +49,22 @@ def test_load_frontmatter(tmp_path):
         Content.
     """).strip(), encoding="utf-8")
 
+    nocontent = tmp_path / "nocontent.md"
+    nocontent.write_text(textwrap.dedent("""
+        ---
+        title: "no content"
+        date: 2023-10-27
+        tags: [python, pytest]
+        published: true
+        ---
+    """).strip(), encoding="utf-8")
+
+    return good, none, bad1, bad2, bad3, nocontent
+
+def test_load_frontmatter(tmp_path):
+    """Test the load in different samples files"""
+
+    good, none, bad1, bad2, bad3, nocontent = files_samples(tmp_path)
     #### ASSERTS
     # good
     front, content, has_frontmatter_good = load_frontmatter(good)
@@ -99,3 +112,8 @@ Its open?""" == content
 - Only items
 ---
 Content.""" == content
+    
+    # no content
+    front, content, has_frontmatter_nocontent = load_frontmatter(nocontent)
+    assert content == []
+    assert has_frontmatter_nocontent == True

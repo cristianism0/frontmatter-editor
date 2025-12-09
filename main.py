@@ -4,7 +4,7 @@ from pathlib import Path
 
 from config import PATH, CREATE_BACKUP, BACKUP_PATH, EXCLUDE_DIRS, DRY_RUN_MODE
 from src.utils import sub_proceed, backup_dir, json_maker
-from src.file_handle.file_manager import backup_dir, collect_dirs_and_files, metadata_remover, metadata_changer
+from src.file_handle.file_manager import collect_dirs_and_files, metadata_remover, metadata_changer
 
 def main():
     print("FRONTMATTER CHANGER\n")
@@ -70,7 +70,7 @@ def main():
         try:
             output = int(input("Type your choice: ")).strip()
         except Exception as e:
-            print("Oops! An error ocurred: {e}")
+            print(f"Oops! An error ocurred: {e}")
 
 
         ### Script Body:

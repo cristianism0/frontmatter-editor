@@ -58,14 +58,14 @@ def json_templater(files: list) -> list:
     for file in files:
         json_template = {
             "title": file.name,
-            "path": file.as_posix(),
+            "path": file.as_posix()
             }
         
         json_complete.append(json_template)
     
     return json_complete
 
-def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
+def json_maker(files: list, previous: dict, new: dict, status: dict, dry_run: bool) -> dict:
     """Create a JSON file with all alterations"""
 
     json_list = json_templater(files)
@@ -76,9 +76,11 @@ def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
 
         old_value = previous.get(file_key)
         new_value = new.get(file_key)
+        status_value = status.get(file_key)
 
         entry["old_value"] = f"{old_value}"
         entry["new_value"] = f"{new_value}"
+        entry["status_frontmatter"] = f"{status_value}"
     
     if dry_run:
         json_file_name = f'dry-run_{datetime.now()}.json'
@@ -100,3 +102,4 @@ def json_maker(files: list, previous: dict, new: dict, dry_run: bool) -> dict:
     print(f"A JSON file created at: {json_path}")
 
     return json_list
+    

@@ -7,7 +7,7 @@ The stroger use if for alter a big bunch of `md` file fast, usually, *Obsidian V
 
 ## How to use:
 ### WARNING
-The script is written to be used in UNIX systems. The path style used here is *forward slashes*, even `pathlib` has a support for it, yet, **i did not tested**.
+The script is written to be used in UNIX systems. The path style used here is *forward slashes*, even `pathlib` has a support for it, yet, **i don't tested**.
 If you are using *Windows*, create a BACKUP before use the script.
 
 ### Requirements:

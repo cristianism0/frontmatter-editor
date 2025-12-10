@@ -6,7 +6,7 @@ from src.utils import sub_proceed, backup_dir, json_maker
 from src.file_handle.file_manager import collect_dirs_and_files, metadata_remover, metadata_set_update
 
 # Select the PATH, use a '.' if you're already on it.
-PATH = Path('Vault')
+PATH = Path('.')
 
 # Do you want to backup all your files on a BACKUP directory?
 # YES -> True (default)

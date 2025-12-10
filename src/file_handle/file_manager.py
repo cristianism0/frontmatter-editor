@@ -34,12 +34,13 @@ def file_reconstruct(file, header, body, frontmatter: bool) -> None:
 
         f.writelines(body)
 
-def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
+def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict, dict, dict, dict]:
     """Remove one key of the frontmatter and its value."""
-
     previous_delete_content = {}
     after_delete_content = {}
     status_frontmatter = {}
+    actions = {}
+    keys = {}
 
     for file in files:
         try:
@@ -51,7 +52,6 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
                 file_reconstruct(file, new_header, body_lines, has_frontmatter)
             else:
                 continue
-
             
         # Save content for log:
         file_key = file.as_posix()
@@ -65,9 +65,11 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
 
         previous_delete_content[file_key] = old_value
 
+        actions[file_key] = "remove"
+        keys[file_key] = key
+
         # Create a new header_lines for manipulation
         new_header = header_lines.copy()
-
         try:
             #delete the key provided in the new header
             new_header.pop(key)        
@@ -84,13 +86,15 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
-    return previous_delete_content, after_delete_content, status_frontmatter
+    return keys, previous_delete_content, after_delete_content, status_frontmatter, actions
 
-def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
+def metadata_set_update(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict, dict, dict, dict]:
     """Change the value of one key of the frontmatter."""
     previous_change_content = {}
     after_change_content = {}
     status_frontmatter = {}
+    actions = {}
+    keys = {}
 
     for file in files:
         header_lines, body_lines, has_frontmatter = load_frontmatter(file)
@@ -102,20 +106,27 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
             status_frontmatter[file_key] = f"{file} has frontmatter"
         else:
             status_frontmatter[file_key] = f"{file} doesn't have frontmatter"
+
         old_value = header_lines.get(key)      #the value with the key that i gave
         new_value = content                    #new value is the content
 
-        previous_change_content[file_key] = old_value 
+        previous_change_content[file_key] = old_value
+
+        if key in header_lines:
+            actions[file_key] = "change" 
+        else:
+            actions[file_key] = "add" 
+
+        keys[file_key] = key
+
 
         # Create a new header_lines for manipulation 
         new_header = header_lines.copy()
-
         try:
             new_header[key] = content
 
             # for log
             after_change_content[file_key] = new_value
-            #print(f"{changed_files} was changed. {key} value was changed to {content}.\n")
 
         except Exception as e:
             # It will capture failured.
@@ -126,49 +137,4 @@ def metadata_changer(key: str, content: str, files: list, dry_run: bool) -> Tupl
         if not dry_run:
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
-    return previous_change_content, after_change_content, status_frontmatter
-
-def metadata_add(key: str, content: str, files: list, dry_run: bool) -> Tuple[dict, dict]:
-    """Add a value on the frontmatter of each file."""
-    previous_add_content = {}
-    after_add_content = {}
-    status_frontmatter = {}
-
-    for file in files:
-        header_lines, body_lines, has_frontmatter = load_frontmatter(file)
-
-        # Save content for log:
-        file_key = file.as_posix()
-        if has_frontmatter:
-            status_frontmatter[file_key] = f"{file} has frontmatter"
-        else:
-            status_frontmatter[file_key] = f"{file} doesn't have frontmatter"
-
-        
-        old_value = header_lines.get(key, None)  #-> Returns None
-        new_value = content
-
-        previous_add_content[file_key] = old_value 
-
-        # Create a new header_lines for manipulation 
-        new_header = header_lines.copy()
-
-        try:
-            # add the new value on the new header
-            new_header[key] = new_value
-            #print(f"{changed_files} was changed. {key} value {content} was added to the frontmatter.\n")
-
-            #for log
-            after_add_content[file_key] = new_value
-
-        except KeyError as e:
-            # It will capture failured.
-            #print(f"Cannot change the {key} value: {e} not found in {file}")
-            # for log
-            after_add_content[file_key] = content
-            continue
-        if not dry_run:
-            file_reconstruct(file, new_header, body_lines, has_frontmatter)
- 
-    return previous_add_content, after_add_content, status_frontmatter
-
+    return keys, previous_change_content, after_change_content, status_frontmatter, actions

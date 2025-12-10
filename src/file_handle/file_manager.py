@@ -13,10 +13,13 @@ def collect_dirs_and_files(path: Path, exclude_dirs: list, backup_path: Path ) -
     # Iterate over all directories and find .md files:
     for dirs in filtered_dirs:
         # Collect files on selected subdirectories
-        files = list((path / dirs).glob("*.md"))
+        # filter dirs already collect the files on the path, here, we will only get from sub.
+        files = list((dirs).glob("*.md"))
+
+        print(f"\nDEBUG DENTRO DO FILEMANAGER {files}")
+
         # Put all files collected here
         md_files.extend(files)
-
 
     return filtered_dirs, md_files
 
@@ -138,3 +141,4 @@ def metadata_set_update(key: str, content: str, files: list, dry_run: bool) -> T
             file_reconstruct(file, new_header, body_lines, has_frontmatter)
  
     return keys, previous_change_content, after_change_content, status_frontmatter, actions
+

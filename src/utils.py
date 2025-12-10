@@ -65,7 +65,7 @@ def json_templater(files: list) -> list:
     
     return json_complete
 
-def json_maker(files: list, previous: dict, new: dict, status: dict, dry_run: bool) -> dict:
+def json_maker(json_path: Path,files: list, keys: dict, previous: dict, new: dict, status: dict, action: dict, dry_run: bool) -> dict:
     """Create a JSON file with all alterations"""
 
     json_list = json_templater(files)
@@ -73,33 +73,35 @@ def json_maker(files: list, previous: dict, new: dict, status: dict, dry_run: bo
     for entry, file in zip(json_list, files):
 
         file_key = file.as_posix()
-
+        
+        key_value = keys.get(file_key)
         old_value = previous.get(file_key)
         new_value = new.get(file_key)
         status_value = status.get(file_key)
+        action_value = action.get(file_key)
 
+        entry["key"] = f"{key_value}"
         entry["old_value"] = f"{old_value}"
         entry["new_value"] = f"{new_value}"
+        entry["action"] = f"{action_value}"
         entry["status_frontmatter"] = f"{status_value}"
-    
+
     if dry_run:
         json_file_name = f'dry-run_{datetime.now()}.json'
     
     else:
         json_file_name = f'changes_{datetime.now()}.json'
 
-    json_path = Path('change_logs') / json_file_name
-    json_path.parent.mkdir(parents = True, exist_ok = True)
+    json_path_file = json_path / json_file_name
+    json_path.mkdir(parents = True, exist_ok = True)
 
     #JSON dumps uses ensure_ascii = True by default, which encode special char: ~, ç ...
     #This makes JSON flexible to system that can only read ASCII
     #If you want to enable do ensure_ascii = False
 
-    with open(json_path, 'w', encoding='utf8') as json_file:
+    with open(json_path_file, 'w', encoding='utf8') as json_file:
         # ensure_ascii=False 
         json.dump(json_list, json_file, indent = 4, ensure_ascii=False)
-
-    print(f"A JSON file created at: {json_path}")
 
     return json_list
     

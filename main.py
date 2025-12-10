@@ -11,7 +11,7 @@ PATH = Path('Vault')
 # Do you want to backup all your files on a BACKUP directory?
 # YES -> True (default)
 # NO -> False
-CREATE_BACKUP = False
+CREATE_BACKUP = True
 
 # If you want to change backup directory path, change the path inside Path('new/path').
 BACKUP_PATH = PATH / 'BACKUP'

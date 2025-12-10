@@ -13,31 +13,37 @@ If you are using *Windows*, create a BACKUP before use the script.
 ### Requirements:
 - Git
 - *a directory*
+- Python >= 3.14 
+- PyYAML 25.7.0
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/cristianism0/Metadata-Changer.git
+git clone https://github.com/cristianism0/Frontmatter-Script.git
 ```
 
-2. **EDIT CONFIG FILE**: Here is the heart of the script.
+1. **EDIT MAIN FILE**: Here is the heart of the script.
 ```bash
 cd Metadata-Changer
-nano config.py          #or whatever text editor you like
+nano main.py          #or whatever text editor you like
 ```
-In `config.py` you will need to change the options for your script:
+
+In `main.py` you will need to change the options for your script:
 - If you want a backup directory.
 - Your directory path.
 - **If your script will run or not.**
 
-3. Once made the edits, move the files to your directory:
+1. Once made the edits, move the files to your directory:
 ```bash
 cd Metadata-Changer
-mv config.py your/directory/with/md/.py
 mv file_manager.py your/directory/with/md/.py
 mv main.py your/directory/with/md/.py
 ```
-
-4. Execute it:
+1. Execute it:
 ```bash
-./main.py
+chmod a+rwx main.py && ./main.py
 ```
+Or if you dont want to set a `chmod`, just use Python:
+```bash
+python main.py
+uv run main.py #if you are using uv (and you should)
+``` 

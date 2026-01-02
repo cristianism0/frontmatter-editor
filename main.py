@@ -25,8 +25,10 @@ LOG_PATH = Path('change_logs')
 EXCLUDE_DIRS = []
 
 # DRY RUN prevents any alteration on files
-# FALSE by default for secure, change to TRUE to activate the script
-DRY_RUN_MODE = False
+# TRUE by default
+default.
+# FALSE will make changes.
+DRY_RUN_MODE = True
 
 def main():
     print("FRONTMATTER CHANGER")

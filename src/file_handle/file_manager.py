@@ -16,8 +16,6 @@ def collect_dirs_and_files(path: Path, exclude_dirs: list, backup_path: Path ) -
         # filter dirs already collect the files on the path, here, we will only get from sub.
         files = list((dirs).glob("*.md"))
 
-        print(f"\nDEBUG DENTRO DO FILEMANAGER {files}")
-
         # Put all files collected here
         md_files.extend(files)
 
@@ -52,7 +50,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict, 
         except:
             print(f"{file} was not changed.")
             if not dry_run:
-                file_reconstruct(file, new_header, body_lines, has_frontmatter)
+                file_reconstruct(file, header_lines, body_lines, has_frontmatter)
             else:
                 continue
             
@@ -77,7 +75,7 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict, 
             #delete the key provided in the new header
             new_header.pop(key)        
             # For log -> Put None
-            after_delete_content[file_key] = None
+            after_delete_content[file_key] = ""
 
         except Exception as e:
             # It will capture failured.

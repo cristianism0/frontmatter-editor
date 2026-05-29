@@ -75,13 +75,13 @@ def metadata_remover(key: str, files: list, dry_run: bool) -> Tuple[dict, dict, 
             #delete the key provided in the new header
             new_header.pop(key)        
             # For log -> Put None
-            after_delete_content[file_key] = ""
+            after_delete_content[file_key] = "removed"
 
         except Exception as e:
             # It will capture failured.
             #print(f"A error has ocurred on file: {file}. ERROR: {e} ")
             #for log
-            after_delete_content[file_key] = "!!!FAILED!!!"
+            after_delete_content[file_key] = "failed"
             continue
 
         if not dry_run:

@@ -65,7 +65,7 @@ def json_templater(files: list) -> list:
     
     return json_complete
 
-def json_maker(json_path: Path,files: list, keys: dict, previous: dict, new: dict, status: dict, action: dict, dry_run: bool) -> dict:
+def json_maker(log_dir: Path, files: list, keys: dict, previous: dict, new: dict, status: dict, action: dict, dry_run: bool) -> dict:
     """Create a JSON file with all alterations"""
 
     json_list = json_templater(files)
@@ -92,15 +92,14 @@ def json_maker(json_path: Path,files: list, keys: dict, previous: dict, new: dic
     else:
         json_file_name = f'changes_{datetime.now()}.json'
 
-    json_path_file = json_path / json_file_name
-    json_path.mkdir(parents = True, exist_ok = True)
+    json_path_file = log_dir / json_file_name
+    log_dir.mkdir(parents = True, exist_ok = True)
 
     #JSON dumps uses ensure_ascii = True by default, which encode special char: ~, ç ...
     #This makes JSON flexible to system that can only read ASCII
     #If you want to enable do ensure_ascii = False
 
     with open(json_path_file, 'w', encoding='utf8') as json_file:
-        # ensure_ascii=False 
         json.dump(json_list, json_file, indent = 4, ensure_ascii=False)
 
     return json_list

@@ -133,7 +133,7 @@ def test_metadata_remover_successful_dry_run(mocker, files_list):
     keys, prev, after, status, action = metadata_remover(key_to_delete, files_list[:1], dry_run=True)
     
     assert prev[file_path] == "test"
-    assert after[file_path] is None
+    assert after[file_path] == "removed"
     assert "has frontmatter" in status[file_path]
     mock_reconstruct.assert_not_called()
 
@@ -148,7 +148,7 @@ def test_metadata_remover_key_not_found(mocker, files_list):
     keys, prev, after, status, action= metadata_remover(key_to_delete, files_list[:1], dry_run=True)
 
     assert prev[file_path] is None
-    assert after[file_path] == "!!!FAILED!!!"
+    assert after[file_path] == "failed"
     mock_reconstruct.assert_not_called()
 
 def test_metadata_remover_no_frontmatter(mocker, files_list):
@@ -162,7 +162,7 @@ def test_metadata_remover_no_frontmatter(mocker, files_list):
     keys, prev, after, status, action = metadata_remover(key_to_delete, files_list[:1], dry_run=True)
 
     assert prev[file_path] is None
-    assert after[file_path] == "!!!FAILED!!!"
+    assert after[file_path] == "failed"
     assert "doesn't have frontmatter" in status[file_path]
     
 def test_metadata_set_update_successful_change(mocker, files_list):

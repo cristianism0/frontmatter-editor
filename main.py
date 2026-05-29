@@ -76,7 +76,12 @@ Usage examples:
         default=None,
         help='Path to save JSON log file (default: PATH/frontmatter_log.json)'
     )
-    
+    parser.add_argument(
+        '--log-path',
+        type=str,
+        default=None,
+        help='Directory to save JSON log files (default: <path>/frontmatter_log/)'
+    )
     return parser.parse_args()
 
 
@@ -97,9 +102,9 @@ def main():
         BACKUP_PATH = PATH / 'backup'
     
     if args.log_path:
-        LOG_PATH = Path(args.log_path).resolve()
+        LOG_DIR = Path(args.log_path).resolve()
     else:
-        LOG_PATH = PATH / 'frontmatter_log.json'
+        LOG_DIR = PATH / 'frontmatter_log'
     
     # Validate PATH
     if not PATH.exists():
@@ -203,7 +208,7 @@ def main():
                     dry_run=DRY_RUN_MODE)
                
                 json_maker(
-                    json_path=LOG_PATH,
+                    log_dir=LOG_DIR,
                     files=files,
                     keys=remove_keys,
                     previous=prev_delete,
@@ -252,7 +257,6 @@ def main():
             end_time = time.time()
             print(f"Closing script. Execution time: {(end_time - init_time):.4f} s.")
             break
-
 
 if __name__ == '__main__':
     main()

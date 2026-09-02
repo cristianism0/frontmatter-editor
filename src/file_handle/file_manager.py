@@ -9,11 +9,10 @@ def collect_dirs_and_files(path: Path, exclude_dirs: list, backup_path: Path ) -
     
     filtered_dirs = filter_dirs(path, exclude_dirs, backup_path)
 
-    md_files = []
+    md_files = list(path.glob("*.md"))
     # Iterate over all directories and find .md files:
     for dirs in filtered_dirs:
         # Collect files on selected subdirectories
-        # filter dirs already collect the files on the path, here, we will only get from sub.
         files = list((dirs).glob("*.md"))
 
         # Put all files collected here

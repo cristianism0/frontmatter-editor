@@ -37,46 +37,40 @@ Usage examples:
     )
     
     # Required argument: directory
-    parser.add_argument(
+    _ = parser.add_argument(
         'path',
         type=str,
         help='Path to directory containing Markdown files'
     )
     
     # Optional arguments
-    parser.add_argument(
+    _ = parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Simulate modifications without altering files'
     )
     
-    parser.add_argument(
+    _ = parser.add_argument(
         '--backup',
         action='store_true',
         help='Create backup of files before modifying'
     )
     
-    parser.add_argument(
+    _ = parser.add_argument(
         '--backup-path',
         type=str,
         default=None,
         help='Custom path for backup directory (default: PATH/backup)'
     )
     
-    parser.add_argument(
+    _ = parser.add_argument(
         '--exclude',
         nargs='+',
         default=['.git', 'node_modules', '__pycache__'],
         help='Directories to exclude from search (default: .git node_modules __pycache__)'
     )
     
-    parser.add_argument(
-        '--log-path',
-        type=str,
-        default=None,
-        help='Path to save JSON log file (default: PATH/frontmatter_log.json)'
-    )
-    parser.add_argument(
+    _ = parser.add_argument(
         '--log-path',
         type=str,
         default=None,
@@ -125,7 +119,7 @@ def main():
     if CREATE_BACKUP:
         print(f"Backup Path: {BACKUP_PATH}")
     print(f"Excluded Directories: {', '.join(EXCLUDE_DIRS)}")
-    print(f"Log Path: {LOG_PATH}")
+    print(f"Log Path: {LOG_DIR}")
     print("="*60)
     print()
     
@@ -207,7 +201,7 @@ def main():
                     files=files,
                     dry_run=DRY_RUN_MODE)
                
-                json_maker(
+                _ = json_maker(
                     log_dir=LOG_DIR,
                     files=files,
                     keys=remove_keys,
@@ -239,8 +233,8 @@ def main():
                     files=files,
                     dry_run=DRY_RUN_MODE)
                
-                json_maker(
-                    json_path=LOG_PATH,
+                _ = json_maker(
+                    log_dir=LOG_DIR,
                     files=files,
                     keys=change_upt_keys,
                     previous=prev_change_upt,

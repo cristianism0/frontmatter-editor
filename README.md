@@ -14,7 +14,7 @@ CLI tool to read, add, update, or remove frontmatter keys across multiple Markdo
 ## Requirements
 
 - Python >= 3.14 - Uses `pathlib.PosixPath.copy_into()` introduced in 3.14.
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- [uv](https://docs.astral.sh/uv/) (recommended)
 
 ## Installation
 
@@ -24,17 +24,17 @@ cd frontmatter-editor
 uv sync
 ```
 
-With pip:
-
-```bash
-pip install -r requirements.txt
-```
-
 ## Usage
 
 ```bash
 uv run main.py <path> [options]
 ```
+
+The script runs interactively. After setup, it prompts you to choose:
+
+1. **Remove** frontmatter by key
+2. **Change or Update** frontmatter by key
+- **q** — Quit
 
 ### Options
 
@@ -44,7 +44,7 @@ uv run main.py <path> [options]
 | `--backup` | Create backup before modifying |
 | `--backup-path PATH` | Custom backup directory (default: `<path>/backup`) |
 | `--exclude DIR ...` | Directories to skip (default: `.git`, `node_modules`, `__pycache__`) |
-| `--log-path PATH` | Path for JSON log file (default: `<path>/frontmatter_log.json`) |
+| `--log-path PATH` | Directory for JSON log files (default: `<path>/frontmatter_log/`) |
 
 ### Examples
 
@@ -62,7 +62,7 @@ uv run main.py /path/to/vault --exclude templates --backup
 
 ## JSON log
 
-Every run produces a log file with one entry per file:
+Every run produces a directory with timestamped log files (one per execution):
 
 ```json
 [
@@ -80,12 +80,32 @@ Every run produces a log file with one entry per file:
 
 Dry-run logs are prefixed with `dry-run_`. Real runs are prefixed with `changes_`.
 
+## Project structure
+
+```
+frontmatter-editor/
+├── main.py                              # CLI entry point
+├── src/
+│   ├── __init__.py
+│   ├── utils.py                         # Backup, filtering, JSON logging
+│   ├── file_handle/
+│   │   ├── __init__.py
+│   │   └── file_manager.py              # File collection, removal, set/update
+│   └── frontmatter_handler/
+│       ├── __init__.py
+│       └── parser.py                    # YAML frontmatter parser
+└── tests/
+    ├── test_file_manager.py
+    ├── test_parser.py
+    └── test_utils.py
+```
+
 ## Limitations
 
 - Tested on UNIX systems only. Windows support is untested — use `--backup`
   before running on Windows.
 - Does not handle nested frontmatter keys.
-  - Does not work on `+++//+++` kind.
+- Does not support TOML-style frontmatter delimiters (`+++`).
 
 ## Running tests
 

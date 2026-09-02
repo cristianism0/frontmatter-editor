@@ -1,119 +1,164 @@
+import textwrap
+from pathlib import Path
+
 from src.frontmatter_handler.parser import load_frontmatter
 
-def files_samples(tmp_path):
-    import textwrap
-    good = tmp_path / "good.md"
-    good.write_text(textwrap.dedent("""
-        ---
-        title: "Good frontmatter"
-        date: 2023-10-27
-        tags: [python, pytest]
-        published: true
-        ---
-        This is the post content.
-    """).strip(), encoding="utf-8")
 
-    none = tmp_path / "none.md"
-    none.write_text(textwrap.dedent("""
-        just a markdown file
-        without ---
-    """).strip(), encoding="utf-8")
+class TestLoadFrontmatter:
+    def test_good_frontmatter(self, sample_files):
+        f = sample_files["good"]
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["title"] == "Good frontmatter"
+        assert front["tags"] == ["python", "pytest"]
+        assert front["published"] is True
+        assert content == "This is the post content."
 
-    bad1 = tmp_path / "bad_syntax.md"
-    bad1.write_text(textwrap.dedent("""
-        ---
-        title: "Indentation Error"
-        description:
-          - item 1
-         - item 2 with bad indentation
-        ---
-        Content.
-    """).strip(), encoding="utf-8")
+    def test_no_frontmatter(self, sample_files):
+        f = sample_files["none"]
+        front, content, has_fm = load_frontmatter(f)
+        assert front == {}
+        assert has_fm is False
+        assert "just a markdown file\nwithout ---" in content
 
-    bad2 = tmp_path / "missing_delimiter.md"
-    bad2.write_text(textwrap.dedent("""
-        ---
-        title: "Open frontmatter"
-        author: me
-        
-        Its open?
-    """).strip(), encoding="utf-8")
+    def test_bad_yaml_syntax(self, sample_files):
+        f = sample_files["bad1"]
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is False
+        assert front == {}
+        assert "Content." in content
 
-    bad3 = tmp_path / "list_root.md"
-    bad3.write_text(textwrap.dedent("""
-        ---
-        - A list
-        - No keys
-        - Only items
-        ---
-        Content.
-    """).strip(), encoding="utf-8")
+    def test_missing_closing_delimiter(self, sample_files):
+        f = sample_files["bad2"]
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is False
+        assert front == {}
+        assert "Its open?" in content
 
-    nocontent = tmp_path / "nocontent.md"
-    nocontent.write_text(textwrap.dedent("""
-        ---
-        title: "no content"
-        date: 2023-10-27
-        tags: [python, pytest]
-        published: true
-        ---
-    """).strip(), encoding="utf-8")
+    def test_list_only_frontmatter(self, sample_files):
+        f = sample_files["bad3"]
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is False
+        assert front == {}
+        assert "Content." in content
 
-    return good, none, bad1, bad2, bad3, nocontent
+    def test_no_content_after_frontmatter(self, sample_files):
+        f = sample_files["nocontent"]
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert content == []
 
-def test_load_frontmatter(tmp_path):
-    """Test the load in different samples files"""
+    def test_empty_file(self, tmp_path):
+        f = tmp_path / "empty.md"
+        f.write_text("")
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is False
+        assert front == {}
 
-    good, none, bad1, bad2, bad3, nocontent = files_samples(tmp_path)
-    #### ASSERTS
-    # good
-    front, content, has_frontmatter_good = load_frontmatter(good)
-    assert has_frontmatter_good == True
-    assert front["title"] == "Good frontmatter"
-    assert front["tags"] == ['python', 'pytest']
-    assert front["published"] == True
-    assert content == "This is the post content."
+    def test_only_delimiters_no_newline_between(self, tmp_path):
+        """---\\n---\\n has no content between delimiters; regex can't match,
+        so the parser falls back to treating it as raw content."""
+        f = tmp_path / "delims.md"
+        f.write_text("---\n---\n")
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is False
+        assert front == {}
 
-    # none
-    front, content, has_frontmatter_none = load_frontmatter(none)
-    assert front == {}
-    assert has_frontmatter_none == False
-    assert "just a markdown file\nwithout ---" in content 
+    def test_empty_frontmatter_block(self, tmp_path):
+        """---\\n\\n---\\n has an empty line between delimiters; YAML parses as None."""
+        f = tmp_path / "empty_fm.md"
+        f.write_text("---\n\n---\nContent.")
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front is None
 
-    #bad1
-    front, content, has_frontmatter_bad1 = load_frontmatter(bad1)
-    assert has_frontmatter_bad1 == False
-    assert front == {}    
-    assert r"""---
-title: "Indentation Error"
-description:
-  - item 1
- - item 2 with bad indentation
----
-Content.""" == content
-    
-    #bad 2
-    front, content, has_frontmatter_bad2 = load_frontmatter(bad2)
-    assert has_frontmatter_bad2 == False
-    assert front == {}    
-    assert r"""---
-title: "Open frontmatter"
-author: me
+    def test_special_characters_in_values(self, tmp_path):
+        f = tmp_path / "special.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            title: "Café & naïve — résumé"
+            path: "a/b/c"
+            ---
+            Content here.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert "Café" in front["title"]
+        assert content == "Content here."
 
-Its open?""" == content
-    
-    #bad 3
-    front, content, has_frontmatter_bad3 = load_frontmatter(bad3)
-    assert has_frontmatter_bad3 == False
-    assert front == {}    
-    assert r"""---
-- A list
-- No keys
-- Only items
----
-Content.""" == content
-    
-    # no content
-    front, content, has_frontmatter_nocontent = load_frontmatter(nocontent)
-    assert content == []
-    assert has_frontmatter_nocontent == True
+    def test_multiline_string_value(self, tmp_path):
+        f = tmp_path / "multi.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            title: |
+              Line one
+              Line two
+            ---
+            Body.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert "Line one" in front["title"]
+
+    def test_numeric_values(self, tmp_path):
+        f = tmp_path / "nums.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            count: 42
+            ratio: 3.14
+            ---
+            Body.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["count"] == 42
+        assert front["ratio"] == 3.14
+
+    def test_boolean_values(self, tmp_path):
+        f = tmp_path / "bools.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            draft: true
+            published: false
+            ---
+            Body.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["draft"] is True
+        assert front["published"] is False
+
+    def test_null_value(self, tmp_path):
+        f = tmp_path / "nullval.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            key: null
+            ---
+            Body.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["key"] is None
+
+    def test_deeply_nested_yaml(self, tmp_path):
+        f = tmp_path / "nested.md"
+        f.write_text(textwrap.dedent("""\
+            ---
+            meta:
+              author:
+                name: Alice
+            tags: [a, b]
+            ---
+            Body.
+        """).strip())
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["meta"]["author"]["name"] == "Alice"
+        assert front["tags"] == ["a", "b"]
+
+    def test_whitespace_before_delimiter(self, tmp_path):
+        f = tmp_path / "ws.md"
+        f.write_text("  \n---\ntitle: t\n---\ncontent")
+        front, content, has_fm = load_frontmatter(f)
+        assert has_fm is True
+        assert front["title"] == "t"

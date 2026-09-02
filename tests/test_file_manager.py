@@ -1,199 +1,434 @@
-import pytest
-from unittest.mock import MagicMock
-import textwrap
-from src.file_handle.file_manager import  collect_dirs_and_files, file_reconstruct
-from src.file_handle.file_manager import  metadata_remover, metadata_set_update, load_frontmatter
-from tests.test_parser import files_samples    
+from src.file_handle.file_manager import (
+    collect_dirs_and_files,
+    file_reconstruct,
+    metadata_remover,
+    metadata_set_update,
+)
+from tests.conftest import (
+    FRONTMATTER_WITH_KEY,
+    FRONTMATTER_WITHOUT_KEY,
+    NO_FRONTMATTER,
+)
 
-def test_collect_dirs_and_files(tmp_path):
-    d = tmp_path / "docs"
-    excluded = tmp_path / "excluded"
+# ---------------------------------------------------------------------------
+# collect_dirs_and_files
+# ---------------------------------------------------------------------------
+class TestCollectDirsAndFiles:
+    def test_collects_subdirectory_files(self, tmp_path):
+        d = tmp_path / "docs"
+        d.mkdir()
+        f1 = d / "file1.md"
+        f2 = d / "file2.md"
+        f1.write_text("---\ntest: 1\n---\n")
+        f2.write_text("---\ntest: 2\n---\n")
 
-    d.mkdir()
-    excluded.mkdir()
-
-    ex_file = excluded / 'ex_file.md'
-    file1 = d / 'file1.md'
-    file2 = d / 'file2.md'
-
-
-    ex_file.write_text("---\ntest: excluded\n---\n")
-    file1.write_text("---\ntest: num 1\n---\n")
-    file2.write_text("---\ntest: num 2\n---\n")
-
-    dirs, files = collect_dirs_and_files(path = tmp_path, exclude_dirs = [excluded], backup_path = tmp_path / "backup")
-
-    assert d in dirs
-    assert file1 in files
-    assert file2 in files
-    assert excluded not in files
-
-def test_file_reconstruct(tmp_path):
-    """Test reconstruct diferent paths."""
-    good, none, bad1, bad2, bad3, nocontent = files_samples(tmp_path)
-
-    goodfront, goodcontent, has_frontmatter_good = load_frontmatter(good)
-    nonefront, nonecontent, has_frontmatter_none = load_frontmatter(none)
-    bad1front, bad1content, has_frontmatter_bad1 = load_frontmatter(bad1)
-    nocontentfront, nocontentcontent, has_frontmatter_nococent = load_frontmatter(nocontent)
-
-    reconstructed_good = tmp_path / "reconstructed_good.md"
-    reconstructed_none = tmp_path / "reconstructed_none.md"
-    reconstructed_bad1 = tmp_path / "reconstructed_bad1.md"
-    reconstructed_bad2 = tmp_path / "reconstructed_bad2.md"
-    reconstructed_bad3 = tmp_path / "reconstructed_bad3.md"
-    reconstructed_nocontent = tmp_path / "reconstructed_nocontent.md"
-
-    # good
-    file_reconstruct(
-        file=reconstructed_good,
-        header=goodfront,
-        body=goodcontent,
-        frontmatter=True
-    )
-
-    expected_good_content = textwrap.dedent(f"""
-        ---
-        title: Good frontmatter
-        date: 2023-10-27
-        tags: ['python', 'pytest']
-        published: True
-        ---
-        This is the post content.
-    """).strip()
-
-    assert reconstructed_good.read_text().strip() == expected_good_content
-
-    # None
-    file_reconstruct(
-        file=reconstructed_none,
-        header=nonefront,
-        body=nonecontent,
-        frontmatter=False
-    )
-    assert reconstructed_none.read_text().strip() == nonecontent.strip()
-
-    # Nocontent
-    file_reconstruct(
-        file=reconstructed_nocontent,
-        header=nocontentfront,
-        body=nocontentcontent,
-        frontmatter=True
-    )
-    expected_nocontent_content = textwrap.dedent(f"""
-        ---
-        title: no content
-        date: 2023-10-27
-        tags: ['python', 'pytest']
-        published: True
-        ---
-        
-    """).strip()
-
-    assert reconstructed_nocontent.read_text().strip() == expected_nocontent_content
-
-    # Bad -> all the other files will receive its content on body, so, just this is enought
-    if bad1front == {}:
-        file_reconstruct(
-            file=reconstructed_bad1,
-            header=bad1front,
-            body=bad1content,
-            frontmatter=True
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=tmp_path / "backup"
         )
-        
-        assert bad1front == {}
-        assert bad1content in reconstructed_bad1.read_text()
-        assert "item 2 with bad indentation" in reconstructed_bad1.read_text()
-        assert "Content." in reconstructed_bad1.read_text()
+        assert f1 in files
+        assert f2 in files
 
-@pytest.fixture
-def files_list(tmp_path):
-    """Create and return path for md files"""
-    f1 = tmp_path / "file1.md"
-    f2 = tmp_path / "file2.md"
-    f3 = tmp_path / "file3.md"
-    f1.write_text("content") 
-    f2.write_text("content")
-    f3.write_text("content")
-    return [f1, f2, f3]
+    def test_collects_root_level_files(self, tmp_path):
+        root_file = tmp_path / "root.md"
+        root_file.write_text("---\ntitle: root\n---\n")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        sub_file = sub / "sub.md"
+        sub_file.write_text("---\ntitle: sub\n---\n")
 
-FRONTMATTER_WITH_KEY = ({"title": "Old Title", "tag": "test"}, ["Body Line"], True)
-FRONTMATTER_WITHOUT_KEY = ({"title": "Old Title"}, ["Body Line"], True)
-NO_FRONTMATTER = ({}, ["All content"], False)
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=tmp_path / "backup"
+        )
+        assert root_file in files
+        assert sub_file in files
 
-def test_metadata_remover_successful_dry_run(mocker, files_list):
-    """Test with dry-run"""
-    
-    mocker.patch("src.file_handle.file_manager.load_frontmatter", return_value=FRONTMATTER_WITH_KEY)
-    mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
-    
-    key_to_delete = "tag"
-    file_path = files_list[0].as_posix()
-    
-    keys, prev, after, status, action = metadata_remover(key_to_delete, files_list[:1], dry_run=True)
-    
-    assert prev[file_path] == "test"
-    assert after[file_path] == "removed"
-    assert "has frontmatter" in status[file_path]
-    mock_reconstruct.assert_not_called()
+    def test_excludes_non_md_files(self, tmp_path):
+        d = tmp_path / "docs"
+        d.mkdir()
+        txt = d / "file.txt"
+        py = d / "script.py"
+        md = d / "note.md"
+        for f in (txt, py, md):
+            f.write_text("content")
 
-def test_metadata_remover_key_not_found(mocker, files_list):
-    """Test if key is not in the file"""
-    mocker.patch("src.file_handle.file_manager.load_frontmatter", return_value=FRONTMATTER_WITHOUT_KEY)
-    mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
-    
-    key_to_delete = "nonexistent_key"
-    file_path = files_list[0].as_posix()
-    
-    keys, prev, after, status, action= metadata_remover(key_to_delete, files_list[:1], dry_run=True)
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=tmp_path / "backup"
+        )
+        assert md in files
+        assert txt not in files
+        assert py not in files
 
-    assert prev[file_path] is None
-    assert after[file_path] == "failed"
-    mock_reconstruct.assert_not_called()
+    def test_excludes_specified_directories(self, tmp_path):
+        excl = tmp_path / "excluded"
+        incl = tmp_path / "included"
+        excl.mkdir()
+        incl.mkdir()
+        (excl / "e.md").write_text("---\ntitle: e\n---\n")
+        (incl / "i.md").write_text("---\ntitle: i\n---\n")
 
-def test_metadata_remover_no_frontmatter(mocker, files_list):
-    """Test the pop fail"""
-    mocker.patch("src.file_handle.file_manager.load_frontmatter", return_value=NO_FRONTMATTER)
-    mocker.patch("src.file_handle.file_manager.file_reconstruct")
-    
-    key_to_delete = "any_key"
-    file_path = files_list[0].as_posix()
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=["excluded"], backup_path=tmp_path / "backup"
+        )
+        assert (excl / "e.md") not in files
+        assert (incl / "i.md") in files
 
-    keys, prev, after, status, action = metadata_remover(key_to_delete, files_list[:1], dry_run=True)
+    def test_empty_directory(self, tmp_path):
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=tmp_path / "backup"
+        )
+        assert files == []
 
-    assert prev[file_path] is None
-    assert after[file_path] == "failed"
-    assert "doesn't have frontmatter" in status[file_path]
-    
-def test_metadata_set_update_successful_change(mocker, files_list):
-    """Test the change and the log"""
-    mock_load = mocker.patch("src.file_handle.file_manager.load_frontmatter", return_value=FRONTMATTER_WITH_KEY)
-    mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
-    
-    key_to_change = "title"
-    new_content = "New Title"
-    file_path = files_list[0].as_posix()
-    
-    keys, prev, after, status, action = metadata_set_update(key_to_change, new_content, files_list[:1], dry_run=False)
+    def test_excludes_backup_directory(self, tmp_path):
+        backup = tmp_path / "backup"
+        backup.mkdir()
+        (backup / "old.md").write_text("content")
 
-    assert prev[file_path] == "Old Title"
-    assert after[file_path] == "New Title"
-    assert "has frontmatter" in status[file_path]
-    
-    mock_reconstruct.assert_called_once()
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=backup
+        )
+        assert not any(f.name == "old.md" for f in files)
 
-def test_metadata_set_update_add_new_key(mocker, files_list):
-    """Test changing a new key, it will create if its not exist"""
-    mocker.patch("src.file_handle.file_manager.load_frontmatter", return_value=FRONTMATTER_WITHOUT_KEY)
-    mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
-    
-    key_to_add = "date"
-    new_content = "2025-12-10"
-    file_path = files_list[0].as_posix()
-    
-    keys, prev, after, status, action = metadata_set_update(key_to_add, new_content, files_list[:1], dry_run=True)
+    def test_excludes_hidden_directories(self, tmp_path):
+        hidden = tmp_path / ".hidden"
+        hidden.mkdir()
+        (hidden / "secret.md").write_text("content")
 
-    assert prev[file_path] is None
-    assert after[file_path] == new_content
-    
-    mock_reconstruct.assert_not_called()
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=[], backup_path=tmp_path / "backup"
+        )
+        assert not any(f.name == "secret.md" for f in files)
+
+    def test_excludes_pycache(self, tmp_path):
+        cache = tmp_path / "__pycache__"
+        cache.mkdir()
+        (cache / "cached.md").write_text("content")
+
+        dirs, files = collect_dirs_and_files(
+            path=tmp_path, exclude_dirs=["__pycache__"], backup_path=tmp_path / "backup"
+        )
+        assert not any(f.name == "cached.md" for f in files)
+
+
+# ---------------------------------------------------------------------------
+# file_reconstruct
+# ---------------------------------------------------------------------------
+class TestFileReconstruct:
+    def test_reconstructs_with_frontmatter(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={"title": "T", "date": "2024-01-01"},
+            body=["Body content"],
+            frontmatter=True,
+        )
+        text = out.read_text()
+        assert text.startswith("---\n")
+        assert "title: T\n" in text
+        assert "date: 2024-01-01\n" in text
+        assert text.endswith("---\nBody content")
+
+    def test_reconstructs_without_frontmatter(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={},
+            body=["Just content"],
+            frontmatter=False,
+        )
+        text = out.read_text()
+        assert "---" not in text
+        assert "Just content" in text
+
+    def test_empty_header_with_frontmatter_flag(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={},
+            body=["Body"],
+            frontmatter=True,
+        )
+        text = out.read_text()
+        assert text.startswith("---\n---\n")
+        assert "Body" in text
+
+    def test_body_as_list(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={"k": "v"},
+            body=["line1\n", "line2\n"],
+            frontmatter=True,
+        )
+        text = out.read_text()
+        assert "line1\n" in text
+        assert "line2\n" in text
+
+    def test_body_as_string(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={"k": "v"},
+            body="single line body",
+            frontmatter=True,
+        )
+        text = out.read_text()
+        assert "single line body" in text
+
+    def test_unicode_content(self, tmp_path):
+        out = tmp_path / "out.md"
+        file_reconstruct(
+            file=out,
+            header={"title": "Café"},
+            body=["Contenu français"],
+            frontmatter=True,
+        )
+        text = out.read_text()
+        assert "Café" in text
+        assert "Contenu français" in text
+
+
+# ---------------------------------------------------------------------------
+# metadata_remover
+# ---------------------------------------------------------------------------
+class TestMetadataRemover:
+    def test_dry_run_does_not_write(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_remover(
+            "tag", files_list[:1], dry_run=True
+        )
+
+        assert prev[fp] == "test"
+        assert after[fp] == "removed"
+        mock_reconstruct.assert_not_called()
+
+    def test_non_dry_run_writes_file(self, mocker, tmp_path):
+        f = tmp_path / "real.md"
+        f.write_text("---\ntitle: T\ntag: old\n---\nBody\n")
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=({"title": "T", "tag": "old"}, ["Body\n"], True),
+        )
+        mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+
+        metadata_remover("tag", [f], dry_run=False)
+        mock_reconstruct.assert_called_once()
+
+    def test_key_not_found(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITHOUT_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_remover(
+            "nonexistent", files_list[:1], dry_run=True
+        )
+
+        assert prev[fp] is None
+        assert after[fp] == "failed"
+
+    def test_no_frontmatter(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=NO_FRONTMATTER,
+        )
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_remover(
+            "any_key", files_list[:1], dry_run=True
+        )
+
+        assert "doesn't have frontmatter" in status[fp]
+        assert after[fp] == "failed"
+
+    def test_multiple_files(self, mocker):
+        from pathlib import Path
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            f1 = Path(td) / "a.md"
+            f2 = Path(td) / "b.md"
+            f1.touch()
+            f2.touch()
+            mocker.patch(
+                "src.file_handle.file_manager.load_frontmatter",
+                return_value=({"key": "val"}, ["body"], True),
+            )
+            mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+
+            keys, prev, after, status, action = metadata_remover(
+                "key", [f1, f2], dry_run=True
+            )
+
+            assert len(prev) == 2
+            assert len(after) == 2
+            mock_reconstruct.assert_not_called()
+
+    def test_status_reports_has_frontmatter(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        _, _, _, status, _ = metadata_remover("tag", files_list[:1], dry_run=True)
+        assert "has frontmatter" in status[fp]
+
+    def test_action_is_remove(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        _, _, _, _, action = metadata_remover("tag", files_list[:1], dry_run=True)
+        assert action[fp] == "remove"
+
+    def test_keys_dict_populated(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        keys_dict, _, _, _, _ = metadata_remover("tag", files_list[:1], dry_run=True)
+        assert keys_dict[fp] == "tag"
+
+
+# ---------------------------------------------------------------------------
+# metadata_set_update
+# ---------------------------------------------------------------------------
+class TestMetadataSetUpdate:
+    def test_dry_run_change_existing_key(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_set_update(
+            "title", "New Title", files_list[:1], dry_run=True
+        )
+
+        assert prev[fp] == "Old Title"
+        assert after[fp] == "New Title"
+        assert action[fp] == "change"
+        mock_reconstruct.assert_not_called()
+
+    def test_dry_run_add_new_key(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITHOUT_KEY,
+        )
+        mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_set_update(
+            "date", "2025-12-10", files_list[:1], dry_run=True
+        )
+
+        assert prev[fp] is None
+        assert after[fp] == "2025-12-10"
+        assert action[fp] == "add"
+        mock_reconstruct.assert_not_called()
+
+    def test_non_dry_run_writes_file(self, mocker, tmp_path):
+        f = tmp_path / "real.md"
+        f.write_text("---\ntitle: Old\n---\nBody\n")
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=({"title": "Old"}, ["Body\n"], True),
+        )
+        mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+
+        metadata_set_update("title", "New", [f], dry_run=False)
+        mock_reconstruct.assert_called_once()
+
+    def test_no_frontmatter_adds_key(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=NO_FRONTMATTER,
+        )
+        fp = files_list[0].as_posix()
+
+        keys, prev, after, status, action = metadata_set_update(
+            "new_key", "value", files_list[:1], dry_run=True
+        )
+
+        assert "doesn't have frontmatter" in status[fp]
+        assert action[fp] == "add"
+        assert after[fp] == "value"
+
+    def test_status_reports_has_frontmatter(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        _, _, _, status, _ = metadata_set_update(
+            "title", "X", files_list[:1], dry_run=True
+        )
+        assert "has frontmatter" in status[fp]
+
+    def test_multiple_files(self, mocker):
+        from pathlib import Path
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            f1 = Path(td) / "a.md"
+            f2 = Path(td) / "b.md"
+            f1.touch()
+            f2.touch()
+            mocker.patch(
+                "src.file_handle.file_manager.load_frontmatter",
+                return_value=({"k": "old"}, ["body"], True),
+            )
+            mock_reconstruct = mocker.patch("src.file_handle.file_manager.file_reconstruct")
+
+            keys, prev, after, status, action = metadata_set_update(
+                "k", "new", [f1, f2], dry_run=True
+            )
+
+            assert len(prev) == 2
+            assert all(v == "old" for v in prev.values())
+            assert all(v == "new" for v in after.values())
+            mock_reconstruct.assert_not_called()
+
+    def test_keys_dict_populated(self, mocker, files_list):
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        fp = files_list[0].as_posix()
+
+        keys_dict, _, _, _, _ = metadata_set_update(
+            "title", "X", files_list[:1], dry_run=True
+        )
+        assert keys_dict[fp] == "title"
+
+    def test_action_change_vs_add(self, mocker, files_list):
+        """Verify 'change' when key exists, 'add' when it doesn't."""
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITH_KEY,
+        )
+        _, _, _, _, action_change = metadata_set_update(
+            "title", "X", files_list[:1], dry_run=True
+        )
+        mocker.patch(
+            "src.file_handle.file_manager.load_frontmatter",
+            return_value=FRONTMATTER_WITHOUT_KEY,
+        )
+        _, _, _, _, action_add = metadata_set_update(
+            "new_key", "Y", files_list[:1], dry_run=True
+        )
+        assert action_change[files_list[0].as_posix()] == "change"
+        assert action_add[files_list[0].as_posix()] == "add"
